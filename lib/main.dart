@@ -21,6 +21,8 @@ import 'views/screens/dining_screen.dart';
 import 'views/screens/booking_screen.dart';
 import 'views/screens/booking_confirmed_screen.dart';
 import 'views/screens/account_screen.dart';
+import 'views/screens/address_book_screen.dart';
+import 'views/screens/select_location_screen.dart';
 import 'views/screens/help_screen.dart';
 import 'views/screens/chat_screen.dart';
 import 'views/screens/restaurant_profile_screen.dart';
@@ -102,6 +104,8 @@ class AppShell extends ConsumerWidget {
     'booking': BookingScreen(),
     'booking-done': BookingConfirmedScreen(),
     'account': AccountScreen(),
+    'address-book': AddressBookScreen(),
+    'select-location': SelectLocationScreen(),
     'help': HelpScreen(),
     'chat': ChatScreen(),
     'profile': RestaurantProfileScreen(),

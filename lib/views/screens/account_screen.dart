@@ -13,172 +13,432 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appControllerProvider);
+    final stats = [
+      {'icon': Icons.receipt_long_outlined, 'value': '12', 'label': 'Orders'},
+      {'icon': Icons.wallet, 'value': '₹$walletBalance', 'label': 'Wallet'},
+      {'icon': Icons.bookmark_border, 'value': '${addresses.length}', 'label': 'Saved'},
+    ];
 
-    return SafeArea(
-      bottom: false,
-      child: SingleChildScrollView(
-        padding: responsivePageInsets(context, top: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: app.toHome,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.cardBorder, width: 1.5)),
-                    child: const Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.ink),
+    return Scaffold(
+      backgroundColor: AppColors.paleWarmBg,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: AppColors.accentGradient,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('My account', style: AppText.display(size: 20)),
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('My profile', style: AppText.display(size: 24, color: Colors.white, weight: FontWeight.w700)),
+                        ),
+                        GestureDetector(
+                          onTap: app.toHome,
+                          child: const Icon(Icons.home_outlined, color: Colors.white, size: 24),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white30, width: 1.5),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(userInitials, style: AppText.display(size: 26, weight: FontWeight.w800, color: AppColors.accent)),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(userName, style: AppText.display(size: 18, color: Colors.white, weight: FontWeight.w700)),
+                                const SizedBox(height: 6),
+                                Text(userPhone.isNotEmpty ? userPhone : 'No phone added', style: AppText.body(size: 13, color: Colors.white.withOpacity(0.92))),
+                                const SizedBox(height: 4),
+                                Text(userEmail.isNotEmpty ? userEmail : 'No email added', style: AppText.body(size: 13, color: Colors.white.withOpacity(0.8))),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              final updated = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => const _EditProfileDialog(),
+                              );
+                              if (updated == true) {
+                                await AppRepository.syncProfile();
+                                app.refreshAccount();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text('Edit', style: AppText.body(size: 13, color: Colors.white, weight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: stats.map((item) {
+                        return Expanded(
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(item['icon'] as IconData, color: Colors.white, size: 20),
+                                const SizedBox(height: 10),
+                                Text(item['value'] as String, style: AppText.display(size: 16, color: Colors.white, weight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text(item['label'] as String, style: AppText.body(size: 12, color: Colors.white.withOpacity(0.85))),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(color: AppColors.avatarBg, shape: BoxShape.circle, border: Border.all(color: AppColors.avatarBorder, width: 2)),
-                  alignment: Alignment.center,
-                  child: Text(userInitials, style: AppText.display(size: 24, color: AppColors.accent)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(userName, style: AppText.display(size: 20)),
-                      const SizedBox(height: 2),
-                      Text('$userPhone · $userEmail', style: AppText.body(size: 13, weight: FontWeight.w500, color: AppColors.bodyGrey)),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {},
-                  child: Text('Edit', style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.accent)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            _Group(
-              label: 'Food delivery',
-              rows: [
-                _RowData(Icons.receipt_long_outlined, 'Your orders', onTap: app.toOrders),
-                _RowData(Icons.favorite_border, 'Favourites', onTap: () async {
-                  await AppRepository.syncFavorites();
-                  if (favoriteRestaurantIds.isNotEmpty) {
-                    app.openRest(favoriteRestaurantIds.first);
-                  } else {
-                    app.toHome();
-                  }
-                }),
-                _RowData(Icons.badge_outlined, 'Address book', onTap: () async {
-                  await AppRepository.syncAddresses();
-                  app.refreshAccount();
-                }),
-              ],
-            ),
-            _Group(
-              label: 'Payments & offers',
-              rows: [
-                _RowData(Icons.credit_card, 'Payments & wallet', onTap: app.toPayment, trailing: '₹$walletBalance'),
-                _RowData(Icons.confirmation_number_outlined, 'Coupons & offers', onTap: app.toCoupons),
-              ],
-            ),
-            _Group(
-              label: 'More',
-              rows: [
-                _RowData(Icons.support_agent, 'Help & support', onTap: app.toHelp),
-                _RowData(Icons.settings_outlined, 'Settings', onTap: () {
-                  AppRepository.syncSessions();
-                }),
-                _RowData(Icons.logout, 'Log out', onTap: app.logout, danger: true),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-            Center(
-              child: Column(
-                children: [
-                  Opacity(
-                    opacity: 0.4,
-                    child: const BrandLogo.mark(height: 32),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('TAP · EAT · REPEAT · v1.0',
-                      style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.lightGreyText, letterSpacing: 2)),
-                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Quick actions', style: AppText.display(size: 16, weight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Your orders',
+                      subtitle: 'Track recent deliveries',
+                      onTap: app.toOrders,
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.favorite_border,
+                      label: 'Favourites',
+                      subtitle: 'Saved restaurants and dishes',
+                      onTap: () async {
+                        await AppRepository.syncFavorites();
+                        if (favoriteRestaurantIds.isNotEmpty) {
+                          app.openRest(favoriteRestaurantIds.first);
+                        } else {
+                          app.toHome();
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.badge_outlined,
+                      label: 'Address book',
+                      subtitle: 'Manage delivery addresses',
+                      onTap: () async {
+                        await AppRepository.syncAddresses();
+                        app.push('address-book');
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.credit_card,
+                      label: 'Payments & wallet',
+                      subtitle: 'View balance and transactions',
+                      trailing: '₹$walletBalance',
+                      onTap: app.toPayment,
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.confirmation_number_outlined,
+                      label: 'Coupons & offers',
+                      subtitle: 'Apply discounts',
+                      onTap: app.toCoupons,
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.support_agent,
+                      label: 'Help & support',
+                      subtitle: 'Need assistance?',
+                      onTap: app.toHelp,
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.settings_outlined,
+                      label: 'Settings',
+                      subtitle: 'App preferences',
+                      onTap: () {
+                        AppRepository.syncSessions();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _ProfileActionTile(
+                      icon: Icons.logout,
+                      label: 'Log out',
+                      subtitle: 'Sign out of your account',
+                      danger: true,
+                      onTap: app.logout,
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: Column(
+                        children: [
+                          Opacity(opacity: 0.35, child: const BrandLogo.mark(height: 32)),
+                          const SizedBox(height: 8),
+                          Text('TAP · EAT · REPEAT · v1.0', style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.lightGreyText, letterSpacing: 2)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _RowData {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final String? trailing;
-  final bool danger;
-  _RowData(this.icon, this.label, {required this.onTap, this.trailing, this.danger = false});
+class _EditProfileDialog extends StatefulWidget {
+  const _EditProfileDialog();
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
 }
 
-class _Group extends StatelessWidget {
-  final String label;
-  final List<_RowData> rows;
-  const _Group({required this.label, required this.rows});
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: userName);
+    _emailController = TextEditingController(text: userEmail);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await AppRepository.updateProfile(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+    );
+    if (!mounted) return;
+    if (ok) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 4, height: 16, decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(width: 8),
-              Text(label, style: AppText.display(size: 15)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ...rows.asMap().entries.map((e) {
-            final isLast = e.key == rows.length - 1;
-            final r = e.value;
-            return GestureDetector(
-              onTap: r.onTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.hairline))),
-                child: Row(
-                  children: [
-                    Icon(r.icon, size: 22, color: r.danger ? AppColors.red : AppColors.midGrey),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(r.label, style: AppText.body(size: 15, weight: FontWeight.w600, color: r.danger ? AppColors.red : AppColors.ink)),
-                    ),
-                    if (r.trailing != null)
-                      Text(r.trailing!, style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.green))
-                    else
-                      const Icon(Icons.chevron_right, size: 20, color: Color(0xFFC6BCC2)),
-                  ],
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Edit Profile', style: AppText.display(size: 22, weight: FontWeight.w700)),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context, false),
+                    child: const Icon(Icons.close, size: 22, color: AppColors.midGrey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Personalize your dining experience',
+                style: AppText.body(size: 13, color: AppColors.bodyGrey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 22),
+              Container(
+                width: 92,
+                height: 92,
+                decoration: BoxDecoration(
+                  color: AppColors.avatarBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.avatarBorder, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(userInitials, style: AppText.display(size: 28, weight: FontWeight.w800, color: AppColors.accent)),
+              ),
+              const SizedBox(height: 24),
+              _buildProfileField(label: 'Full Name', controller: _nameController),
+              const SizedBox(height: 14),
+              _buildProfileField(label: 'Email Address', controller: _emailController, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text('Save Changes', style: AppText.body(size: 15, weight: FontWeight.w700, color: Colors.white)),
                 ),
               ),
-            );
-          }),
-        ],
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Cancel', style: AppText.body(size: 14, weight: FontWeight.w700, color: AppColors.midGrey)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileField({
+    required String label,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.bodyGrey, letterSpacing: 1.2)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.avatarBg,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: AppColors.cardBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: AppColors.cardBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(18),
+              borderSide: BorderSide(color: AppColors.accent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  final String? trailing;
+  final bool danger;
+
+  const _ProfileActionTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+    this.trailing,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: danger ? AppColors.red.withOpacity(0.06) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.hairline),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: danger ? AppColors.red.withOpacity(0.14) : AppColors.lightGreyBg,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: danger ? AppColors.red : AppColors.ink, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: AppText.body(size: 15, weight: FontWeight.w700, color: danger ? AppColors.red : AppColors.ink)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: AppText.body(size: 13, color: AppColors.bodyGrey)),
+                ],
+              ),
+            ),
+            if (trailing != null)
+              Text(trailing!, style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.ink))
+            else
+              Icon(Icons.chevron_right, color: danger ? AppColors.red : AppColors.midGrey, size: 20),
+          ],
+        ),
       ),
     );
   }
