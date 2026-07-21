@@ -1,4 +1,4 @@
-package com.foodeez.foodeezCustomer
+package com.foodeez.foodeez_customer
 
 import io.flutter.embedding.android.FlutterActivity
 
