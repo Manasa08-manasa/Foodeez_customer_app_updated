@@ -185,6 +185,49 @@ class AppShell extends ConsumerWidget {
             ),
             if (app.showTabBar)
               const Positioned(left: 0, right: 0, bottom: 0, child: DockNav()),
+            if (app.hasCart && app.screen != 'cart' && app.screen != 'menu' && app.screen != 'splash' && app.screen != 'onboarding')
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: app.showTabBar ? MediaQuery.paddingOf(context).bottom + 92 : 20,
+                child: GestureDetector(
+                  onTap: app.toCart,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.accentGradient,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.30),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${app.cartCount} item${app.cartCount > 1 ? 's' : ''} · ₹${app.grandTotal}',
+                              style: AppText.body(size: 14, weight: FontWeight.w800, color: Colors.white),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'View cart',
+                              style: AppText.body(size: 12, weight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.90)),
+                            ),
+                          ],
+                        ),
+                        const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
