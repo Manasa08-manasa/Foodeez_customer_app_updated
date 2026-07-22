@@ -185,7 +185,7 @@ class AppShell extends ConsumerWidget {
             ),
             if (app.showTabBar)
               const Positioned(left: 0, right: 0, bottom: 0, child: DockNav()),
-            if (app.hasCart && app.screen != 'cart' && app.screen != 'menu' && app.screen != 'splash' && app.screen != 'onboarding')
+            if (app.hasCart && app.screen != 'cart' && app.screen != 'menu' && app.screen != 'select-location' && app.screen != 'splash' && app.screen != 'onboarding')
               Positioned(
                 left: 16,
                 right: 16,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/mock_data.dart' as store;
 import '../../models/models.dart';
 import '../../controllers/app_controller.dart';
 import '../../controllers/providers.dart';
+import '../../data/app_repository.dart';
 import '../../core/responsive.dart';
 import '../../theme.dart';
 import '../widgets/common.dart';
@@ -162,6 +164,8 @@ class _CartBodyState extends ConsumerState<_CartBody> {
                 ),
               ),
               const SizedBox(height: 16),
+              _AddressCard(app: app),
+              const SizedBox(height: 16),
               _CouponBanner(app: app),
               const SizedBox(height: 16),
               // Delivery speed options removed as per design request.
@@ -269,6 +273,71 @@ class _CartBodyState extends ConsumerState<_CartBody> {
       default:
         return 'Select';
     }
+  }
+}
+
+class _AddressCard extends StatelessWidget {
+  final AppController app;
+  const _AddressCard({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final defaultAddress = store.addresses.firstWhere(
+      (a) => a['id'] == store.defaultAddressId || a['_id'] == store.defaultAddressId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    final label = (defaultAddress['label'] ?? 'Home').toString();
+    final line1 = (defaultAddress['addressLine1'] ?? '').toString();
+    final line2 = (defaultAddress['addressLine2'] ?? '').toString();
+    final city = (defaultAddress['city'] ?? '').toString();
+    final state = (defaultAddress['state'] ?? '').toString();
+    final pincode = (defaultAddress['pincode'] ?? '').toString();
+
+    final addressText = <String>[line1, line2, city, state, pincode]
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+
+    return GestureDetector(
+      onTap: () async {
+        await AppRepository.syncAddresses();
+        app.push('address-book');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.cardBorder),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Delivery address', style: AppText.body(size: 12, weight: FontWeight.w700, color: AppColors.bodyGrey)),
+                const Spacer(),
+                const Icon(Icons.edit_outlined, size: 18, color: AppColors.accent),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(label, style: AppText.body(size: 15, weight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+              addressText.isNotEmpty ? addressText : 'Add a delivery address',
+              style: AppText.body(size: 13, color: AppColors.bodyGrey),
+            ),
+            if (addressText.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  'Tap to add address in Address Book before placing order.',
+                  style: AppText.body(size: 12, color: AppColors.accent),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -492,35 +561,6 @@ class _MiniStepper extends ConsumerWidget {
   }
 }
 
-class _DeliverySpeedOption extends StatelessWidget {
-  final String label;
-  final String caption;
-  final bool selected;
-  final VoidCallback onTap;
-  const _DeliverySpeedOption({required this.label, required this.caption, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accent : Colors.white,
-          border: Border.all(color: selected ? AppColors.accent : AppColors.chipBorder, width: 1.5),
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: AppText.body(size: 14, weight: FontWeight.w800, color: selected ? Colors.white : AppColors.ink)),
-            Text(caption, style: AppText.body(size: 11, weight: FontWeight.w500, color: selected ? Colors.white.withValues(alpha: 0.85) : AppColors.bodyGrey)),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _BillRow extends StatelessWidget {
   final String label;
