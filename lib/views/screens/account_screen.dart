@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/app_repository.dart';
 import '../../data/mock_data.dart';
 import '../../controllers/providers.dart';
-import '../../core/responsive.dart';
 import '../../theme.dart';
 import '../widgets/brand_logo.dart';
 
@@ -13,79 +12,136 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appControllerProvider);
-  
 
     return Scaffold(
       backgroundColor: AppColors.paleWarmBg,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(bottom: 100),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: double.infinity,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: AppColors.accentGradient,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(22),
+                    bottomRight: Radius.circular(22),
                   ),
                 ),
-                padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child: Text('My profile', style: AppText.display(size: 24, color: Colors.white, weight: FontWeight.w700)),
+                          child: Text(
+                            'My profile',
+                            style: AppText.display(
+                              size: 20,
+                              color: Colors.white,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                         GestureDetector(
                           onTap: app.toHome,
-                          child: const Icon(Icons.home_outlined, color: Colors.white, size: 24),
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.home_outlined,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 12),
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.14),
-                        borderRadius: BorderRadius.circular(24),
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
                       child: Row(
                         children: [
                           Container(
-                            width: 72,
-                            height: 72,
+                            width: 48,
+                            height: 48,
                             decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white30, width: 1.5),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.35),
+                              ),
                             ),
                             alignment: Alignment.center,
-                            child: Text(userInitials, style: AppText.display(size: 26, weight: FontWeight.w800, color: AppColors.accent)),
+                            child: Text(
+                              userInitials,
+                              style: AppText.display(
+                                size: 18,
+                                weight: FontWeight.w800,
+                                color: AppColors.accent,
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(userName, style: AppText.display(size: 18, color: Colors.white, weight: FontWeight.w700)),
-                                const SizedBox(height: 6),
-                                Text(userPhone.isNotEmpty ? userPhone : 'No phone added', style: AppText.body(size: 13, color: Colors.white.withOpacity(0.92))),
-                                const SizedBox(height: 4),
-                                Text(userEmail.isNotEmpty ? userEmail : 'No email added', style: AppText.body(size: 13, color: Colors.white.withOpacity(0.8))),
+                                Text(
+                                  userName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.display(
+                                    size: 15,
+                                    color: Colors.white,
+                                    weight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  userPhone.isNotEmpty
+                                      ? userPhone
+                                      : 'No phone added',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.body(
+                                    size: 12,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
+                                ),
+                                Text(
+                                  userEmail.isNotEmpty
+                                      ? userEmail
+                                      : 'No email added',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.body(
+                                    size: 11.5,
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () async {
                               final updated = await showDialog<bool>(
                                 context: context,
-                                builder: (context) => const _EditProfileDialog(),
+                                builder: (context) =>
+                                    const _EditProfileDialog(),
                               );
                               if (updated == true) {
                                 await AppRepository.syncProfile();
@@ -93,106 +149,139 @@ class AccountScreen extends ConsumerWidget {
                               }
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 7,
                               ),
-                              child: Text('Edit', style: AppText.body(size: 13, color: Colors.white, weight: FontWeight.w700)),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'Edit',
+                                style: AppText.body(
+                                  size: 12,
+                                  color: Colors.white,
+                                  weight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-            
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Quick actions', style: AppText.display(size: 16, weight: FontWeight.w700)),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.receipt_long_outlined,
-                      label: 'Your orders',
-                      subtitle: 'Track recent deliveries',
-                      onTap: app.toOrders,
+                    Text(
+                      'Quick actions',
+                      style: AppText.display(size: 14, weight: FontWeight.w700),
                     ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.favorite_border,
-                      label: 'Favourites',
-                      subtitle: 'Saved restaurants and dishes',
-                      onTap: () async {
-                        await AppRepository.syncFavorites();
-                        if (favoriteRestaurantIds.isNotEmpty) {
-                          app.openRest(favoriteRestaurantIds.first);
-                        } else {
-                          app.toHome();
-                        }
-                      },
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.hairline),
+                      ),
+                      child: Column(
+                        children: [
+                          _ProfileActionTile(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Your orders',
+                            subtitle: 'Track recent deliveries',
+                            onTap: app.toOrders,
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.favorite_border,
+                            label: 'Favourites',
+                            subtitle: 'Saved restaurants and dishes',
+                            onTap: () async {
+                              await AppRepository.syncFavorites();
+                              if (favoriteRestaurantIds.isNotEmpty) {
+                                app.openRest(favoriteRestaurantIds.first);
+                              } else {
+                                app.toHome();
+                              }
+                            },
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.badge_outlined,
+                            label: 'Address book',
+                            subtitle: 'Manage delivery addresses',
+                            onTap: () async {
+                              await AppRepository.syncAddresses();
+                              app.push('address-book');
+                            },
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.credit_card,
+                            label: 'Payments & wallet',
+                            subtitle: 'View balance and transactions',
+                            trailing: '₹$walletBalance',
+                            onTap: app.toPayment,
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.confirmation_number_outlined,
+                            label: 'Coupons & offers',
+                            subtitle: 'Apply discounts',
+                            onTap: app.toCoupons,
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.support_agent,
+                            label: 'Help & support',
+                            subtitle: 'Need assistance?',
+                            onTap: app.toHelp,
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.settings_outlined,
+                            label: 'Settings',
+                            subtitle: 'App preferences',
+                            onTap: () {
+                              AppRepository.syncSessions();
+                            },
+                            showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.logout,
+                            label: 'Log out',
+                            subtitle: 'Sign out of your account',
+                            danger: true,
+                            onTap: app.logout,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.badge_outlined,
-                      label: 'Address book',
-                      subtitle: 'Manage delivery addresses',
-                      onTap: () async {
-                        await AppRepository.syncAddresses();
-                        app.push('address-book');
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.credit_card,
-                      label: 'Payments & wallet',
-                      subtitle: 'View balance and transactions',
-                      trailing: '₹$walletBalance',
-                      onTap: app.toPayment,
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.confirmation_number_outlined,
-                      label: 'Coupons & offers',
-                      subtitle: 'Apply discounts',
-                      onTap: app.toCoupons,
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.support_agent,
-                      label: 'Help & support',
-                      subtitle: 'Need assistance?',
-                      onTap: app.toHelp,
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.settings_outlined,
-                      label: 'Settings',
-                      subtitle: 'App preferences',
-                      onTap: () {
-                        AppRepository.syncSessions();
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _ProfileActionTile(
-                      icon: Icons.logout,
-                      label: 'Log out',
-                      subtitle: 'Sign out of your account',
-                      danger: true,
-                      onTap: app.logout,
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     Center(
                       child: Column(
                         children: [
-                          Opacity(opacity: 0.35, child: const BrandLogo.mark(height: 32)),
-                          const SizedBox(height: 8),
-                          Text('TAP · EAT · REPEAT · v1.0', style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.lightGreyText, letterSpacing: 2)),
+                          Opacity(
+                            opacity: 0.3,
+                            child: const BrandLogo.mark(height: 24),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'TAP · EAT · REPEAT · v1.1.2',
+                            style: AppText.body(
+                              size: 10,
+                              weight: FontWeight.w700,
+                              color: AppColors.lightGreyText,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -251,65 +340,107 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: Text('Edit Profile', style: AppText.display(size: 22, weight: FontWeight.w700)),
+                    child: Text(
+                      'Edit Profile',
+                      style: AppText.display(size: 18, weight: FontWeight.w700),
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context, false),
-                    child: const Icon(Icons.close, size: 22, color: AppColors.midGrey),
+                    child: const Icon(
+                      Icons.close,
+                      size: 20,
+                      color: AppColors.midGrey,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                'Personalize your dining experience',
-                style: AppText.body(size: 13, color: AppColors.bodyGrey),
-                textAlign: TextAlign.center,
+                'Update your account details',
+                style: AppText.body(size: 12.5, color: AppColors.bodyGrey),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 14),
               Container(
-                width: 92,
-                height: 92,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   color: AppColors.avatarBg,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.avatarBorder, width: 1.5),
+                  border: Border.all(color: AppColors.avatarBorder),
                 ),
                 alignment: Alignment.center,
-                child: Text(userInitials, style: AppText.display(size: 28, weight: FontWeight.w800, color: AppColors.accent)),
+                child: Text(
+                  userInitials,
+                  style: AppText.display(
+                    size: 22,
+                    weight: FontWeight.w800,
+                    color: AppColors.accent,
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
-              _buildProfileField(label: 'Full Name', controller: _nameController),
-              const SizedBox(height: 14),
-              _buildProfileField(label: 'Email Address', controller: _emailController, keyboardType: TextInputType.emailAddress),
-              const SizedBox(height: 22),
+              const SizedBox(height: 16),
+              _buildProfileField(
+                label: 'Full Name',
+                controller: _nameController,
+              ),
+              const SizedBox(height: 10),
+              _buildProfileField(
+                label: 'Email Address',
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 46,
                 child: ElevatedButton(
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _saving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text('Save Changes', style: AppText.body(size: 15, weight: FontWeight.w700, color: Colors.white)),
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Save Changes',
+                          style: AppText.body(
+                            size: 14,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
-              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: Text('Cancel', style: AppText.body(size: 14, weight: FontWeight.w700, color: AppColors.midGrey)),
+                child: Text(
+                  'Cancel',
+                  style: AppText.body(
+                    size: 13,
+                    weight: FontWeight.w600,
+                    color: AppColors.midGrey,
+                  ),
+                ),
               ),
             ],
           ),
@@ -326,8 +457,16 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.bodyGrey, letterSpacing: 1.2)),
-        const SizedBox(height: 8),
+        Text(
+          label.toUpperCase(),
+          style: AppText.body(
+            size: 10.5,
+            weight: FontWeight.w700,
+            color: AppColors.bodyGrey,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
@@ -335,18 +474,21 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
             filled: true,
             fillColor: AppColors.avatarBg,
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: AppColors.cardBorder),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: AppColors.cardBorder),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: AppColors.accent),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.accent),
             ),
           ),
         ),
@@ -362,6 +504,7 @@ class _ProfileActionTile extends StatelessWidget {
   final VoidCallback onTap;
   final String? trailing;
   final bool danger;
+  final bool showDivider;
 
   const _ProfileActionTile({
     required this.icon,
@@ -370,49 +513,91 @@ class _ProfileActionTile extends StatelessWidget {
     required this.onTap,
     this.trailing,
     this.danger = false,
+    this.showDivider = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        decoration: BoxDecoration(
-          color: danger ? AppColors.red.withOpacity(0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.hairline),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: danger ? AppColors.red.withOpacity(0.14) : AppColors.avatarBg,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: danger ? AppColors.red : AppColors.ink, size: 22),
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: danger
+                        ? AppColors.red.withValues(alpha: 0.12)
+                        : AppColors.avatarBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    icon,
+                    color: danger ? AppColors.red : AppColors.ink,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: AppText.body(
+                          size: 13.5,
+                          weight: FontWeight.w700,
+                          color: danger ? AppColors.red : AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.body(
+                          size: 11.5,
+                          color: AppColors.bodyGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailing != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(
+                      trailing!,
+                      style: AppText.body(
+                        size: 12.5,
+                        weight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: danger ? AppColors.red : AppColors.midGrey,
+                  size: 18,
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: AppText.body(size: 15, weight: FontWeight.w700, color: danger ? AppColors.red : AppColors.ink)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: AppText.body(size: 13, color: AppColors.bodyGrey)),
-                ],
-              ),
-            ),
-            if (trailing != null)
-              Text(trailing!, style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.ink))
-            else
-              Icon(Icons.chevron_right, color: danger ? AppColors.red : AppColors.midGrey, size: 20),
-          ],
+          ),
         ),
-      ),
+        if (showDivider)
+          const Divider(
+            height: 1,
+            thickness: 1,
+            indent: 56,
+            color: AppColors.hairline,
+          ),
+      ],
     );
   }
 }

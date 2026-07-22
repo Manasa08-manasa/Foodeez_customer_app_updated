@@ -224,6 +224,14 @@ class RemoteMappers {
 
     void addItem(Map item, String section) {
       final m = Map<String, dynamic>.from(item);
+      final isVisible = _bool(m, ['isVisible', 'visible'], true);
+      if (!isVisible) return;
+
+      // Availability comes from isInStock. autoOutOfStock is only a merchant
+      // setting (often true even when the item is still orderable).
+      final isInStock = _bool(m, ['isInStock', 'inStock', 'available'], true);
+      final autoOutOfStock = _bool(m, ['autoOutOfStock'], false);
+
       out.add(MenuItem(
         id: _str(m, ['id', '_id', 'menuItemId'], 'item-${out.length}'),
         section: section,
@@ -242,6 +250,9 @@ class RemoteMappers {
           'thumbnail',
         ], 'biryani')) ??
         'biryani',
+        isInStock: isInStock,
+        autoOutOfStock: autoOutOfStock,
+        isVisible: isVisible,
       ));
     }
 
@@ -254,13 +265,17 @@ class RemoteMappers {
     for (final g in groups.whereType<Map>()) {
       final items = g['items'] ?? g['menuItems'];
       if (items is List) {
-        final section = _str(g, ['name', 'category', 'categoryName', 'section', 'title'], 'Recommended');
+        final section = _str(
+          g,
+          ['displayName', 'name', 'category', 'categoryName', 'section', 'title'],
+          'Recommended',
+        );
         for (final it in items.whereType<Map>()) {
           addItem(it, section);
         }
       } else {
         // flat item list
-        addItem(g, _str(g, ['category', 'categoryName', 'section'], 'Recommended'));
+        addItem(g, _str(g, ['displayName', 'category', 'categoryName', 'section'], 'Recommended'));
       }
     }
     return out;

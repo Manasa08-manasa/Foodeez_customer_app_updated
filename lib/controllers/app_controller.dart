@@ -676,6 +676,15 @@ class AppController extends ChangeNotifier {
   // ---- cart ----
 
   Future<void> add(String id) async {
+    // Never allow ordering out-of-stock menu items.
+    try {
+      final item = menuItemById(id);
+      if (item.isOutOfStock) {
+        notifyListeners();
+        return;
+      }
+    } catch (_) {}
+
     cart[id] = (cart[id] ?? 0) + 1;
     notifyListeners();
     if (!TokenStore.isLoggedIn) return;
