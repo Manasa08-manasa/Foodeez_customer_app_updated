@@ -2,7 +2,7 @@ name: foodeez
 description: "Foodeez — MVC architecture with Riverpod state management."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.0+1
+version: 1.1.2+6
 
 environment:
   sdk: ^3.12.2
