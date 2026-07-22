@@ -13,11 +13,7 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appControllerProvider);
-    final stats = [
-      {'icon': Icons.receipt_long_outlined, 'value': '12', 'label': 'Orders'},
-      {'icon': Icons.wallet, 'value': '₹$walletBalance', 'label': 'Wallet'},
-      {'icon': Icons.bookmark_border, 'value': '${addresses.length}', 'label': 'Saved'},
-    ];
+  
 
     return Scaffold(
       backgroundColor: AppColors.paleWarmBg,
@@ -109,30 +105,7 @@ class AccountScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Row(
-                      children: stats.map((item) {
-                        return Expanded(
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(item['icon'] as IconData, color: Colors.white, size: 20),
-                                const SizedBox(height: 10),
-                                Text(item['value'] as String, style: AppText.display(size: 16, color: Colors.white, weight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text(item['label'] as String, style: AppText.body(size: 12, color: Colors.white.withOpacity(0.85))),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+            
                   ],
                 ),
               ),
@@ -416,7 +389,7 @@ class _ProfileActionTile extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: danger ? AppColors.red.withOpacity(0.14) : AppColors.lightGreyBg,
+                color: danger ? AppColors.red.withOpacity(0.14) : AppColors.avatarBg,
                 borderRadius: BorderRadius.circular(14),
               ),
               alignment: Alignment.center,

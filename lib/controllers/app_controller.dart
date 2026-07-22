@@ -55,6 +55,9 @@ class AppController extends ChangeNotifier {
   bool isHydrating = true;
   bool get isLoggedIn => TokenStore.isLoggedIn;
 
+  /// Flag to determine if SelectLocationScreen should update home location (true) or save address (false)
+  bool selectLocationForHome = false;
+
   // ---- Auth State ----
   /// 'login' | 'signup'
   String authMode = 'login';
@@ -231,6 +234,26 @@ class AppController extends ChangeNotifier {
   Future<void> refreshLocationAndNearby() async {
     await LocationService.ensureLocation();
     await AppRepository.syncRestaurants();
+    notifyListeners();
+  }
+
+  double _parseLatLng(dynamic value, [double fallback = 0.0]) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  void selectAddress(Map<String, dynamic> address) {
+    final lat = _parseLatLng(address['latitude'] ?? address['lat'], ApiConfig.lat);
+    final lng = _parseLatLng(address['longitude'] ?? address['lng'], ApiConfig.lng);
+    final line1 = (address['addressLine1'] ?? '').toString();
+    final city = (address['city'] ?? '').toString();
+    final label = line1.isNotEmpty
+        ? (city.isNotEmpty ? '$line1, $city' : line1)
+        : (address['label']?.toString() ?? 'Saved location');
+
+    ApiConfig.setLocation(latitude: lat, longitude: lng, label: label);
     notifyListeners();
   }
 

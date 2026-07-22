@@ -37,7 +37,10 @@ class HomeScreen extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: app.refreshLocationAndNearby,
+                          onTap: () {
+                            app.selectLocationForHome = true;
+                            app.push('select-location');
+                          },
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

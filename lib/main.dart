@@ -115,9 +115,16 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appControllerProvider);
-    final screen = _screens[app.screen] ?? const HomeScreen();
     final isSplash = app.screen == 'splash';
     final isWide = AppResponsive.of(context).isWide;
+
+    // Create screen dynamically for select-location based on context
+    Widget screen;
+    if (app.screen == 'select-location') {
+      screen = SelectLocationScreen(forHomeLocation: app.selectLocationForHome);
+    } else {
+      screen = _screens[app.screen] ?? const HomeScreen();
+    }
 
     return PopScope(
       // Custom stack is not a Flutter Navigator route — intercept OS back.

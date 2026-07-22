@@ -178,81 +178,92 @@ class _AddressBookScreenState extends ConsumerState<AddressBookScreen> {
                         final isDefault = address['isDefault'] == true;
                         final summary = formatAddressSummary(address);
                         final label = (address['label'] ?? 'Address').toString();
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
+                        return Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                            onTap: () {
+                              app.selectAddress(address);
+                              app.back();
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(label, style: AppText.body(size: 15, weight: FontWeight.w700)),
-                                  ),
-                                  if (isDefault)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.greenPaleBg,
-                                        borderRadius: BorderRadius.circular(999),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(label, style: AppText.body(size: 15, weight: FontWeight.w700)),
                                       ),
-                                      child: Text('Default', style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.green)),
-                                    ),
-                                  PopupMenuButton<String>(
-                                    onSelected: (v) async {
-                                      final id = (address['id'] ?? address['_id'] ?? '').toString();
-                                      if (v == 'edit') {
-                                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddAddressDetailsScreen(
-                                          latitude: (address['latitude'] ?? 0) is num ? (address['latitude'] ?? 0).toDouble() : double.tryParse((address['latitude'] ?? '0').toString()) ?? 0,
-                                          longitude: (address['longitude'] ?? 0) is num ? (address['longitude'] ?? 0).toDouble() : double.tryParse((address['longitude'] ?? '0').toString()) ?? 0,
-                                          resolved: ResolvedAddress(addressLine1: address['addressLine1']?.toString() ?? '', city: address['city']?.toString() ?? '', state: address['state']?.toString() ?? '', pincode: address['pincode']?.toString() ?? ''),
-                                          addressId: id,
-                                          existing: address,
-                                        )));
-                                      } else if (v == 'delete') {
-                                        final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-                                          title: const Text('Delete address'),
-                                          content: const Text('Are you sure you want to delete this address?'),
-                                          actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))],
-                                        ));
-                                        if (confirmed == true) {
+                                      if (isDefault)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.greenPaleBg,
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text('Default', style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.green)),
+                                        ),
+                                      PopupMenuButton<String>(
+                                        onSelected: (v) async {
                                           final id = (address['id'] ?? address['_id'] ?? '').toString();
-                                          if (id.isNotEmpty) {
-                                            await AppRepository.deleteAddress(id);
-                                            await _loadAddresses();
+                                          if (v == 'edit') {
+                                            Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddAddressDetailsScreen(
+                                              latitude: (address['latitude'] ?? address['lat'] ?? 0) is num ? (address['latitude'] ?? address['lat'] ?? 0).toDouble() : double.tryParse((address['latitude'] ?? address['lat'] ?? '0').toString()) ?? 0,
+                                              longitude: (address['longitude'] ?? address['lng'] ?? 0) is num ? (address['longitude'] ?? address['lng'] ?? 0).toDouble() : double.tryParse((address['longitude'] ?? address['lng'] ?? '0').toString()) ?? 0,
+                                              resolved: ResolvedAddress(addressLine1: address['addressLine1']?.toString() ?? '', city: address['city']?.toString() ?? '', state: address['state']?.toString() ?? '', pincode: address['pincode']?.toString() ?? ''),
+                                              addressId: id,
+                                              existing: address,
+                                            )));
+                                          } else if (v == 'delete') {
+                                            final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                                              title: const Text('Delete address'),
+                                              content: const Text('Are you sure you want to delete this address?'),
+                                              actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))],
+                                            ));
+                                            if (confirmed == true) {
+                                              final id = (address['id'] ?? address['_id'] ?? '').toString();
+                                              if (id.isNotEmpty) {
+                                                await AppRepository.deleteAddress(id);
+                                                await _loadAddresses();
+                                              }
+                                            }
                                           }
-                                        }
-                                      }
-                                    },
-                                    itemBuilder: (ctx) => const [
-                                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                        },
+                                        itemBuilder: (ctx) => const [
+                                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                        ],
+                                      ),
                                     ],
                                   ),
+                                  const SizedBox(height: 8),
+                                  Text(summary, style: AppText.body(size: 13, color: AppColors.bodyGrey)),
+                                  const SizedBox(height: 8),
+                                  Builder(builder: (ctx) {
+                                    final lat = address['latitude'] ?? address['lat'];
+                                    final lng = address['longitude'] ?? address['lng'];
+                                    if (lat == null || lng == null) return const SizedBox.shrink();
+                                    double? latd;
+                                    double? lngd;
+                                    try {
+                                      latd = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
+                                      lngd = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
+                                    } catch (_) {}
+                                    if (latd == null || lngd == null) return const SizedBox.shrink();
+                                    return Text('Exact: ${latd.toStringAsFixed(6)}, ${lngd.toStringAsFixed(6)}', style: AppText.body(size: 12, color: AppColors.bodyGrey));
+                                  }),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(summary, style: AppText.body(size: 13, color: AppColors.bodyGrey)),
-                              const SizedBox(height: 8),
-                              Builder(builder: (ctx) {
-                                final lat = address['latitude'];
-                                final lng = address['longitude'];
-                                if (lat == null || lng == null) return const SizedBox.shrink();
-                                double? latd;
-                                double? lngd;
-                                try {
-                                  latd = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
-                                  lngd = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
-                                } catch (_) {}
-                                if (latd == null || lngd == null) return const SizedBox.shrink();
-                                return Text('Exact: ${latd.toStringAsFixed(6)}, ${lngd.toStringAsFixed(6)}', style: AppText.body(size: 12, color: AppColors.bodyGrey));
-                              }),
-                            ],
+                            ),
                           ),
                         );
                       }).toList(),
