@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../../services/location_service.dart';
 import '../../services/api_config.dart';
-import '../../core/responsive.dart';
+import '../../services/recent_locations_store.dart';
 import '../../theme.dart';
 import '../../data/app_repository.dart';
 import '../../data/mock_data.dart' as store;
@@ -31,21 +31,29 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize with current location
     _selectedLocation = LatLng(ApiConfig.lat, ApiConfig.lng);
   }
 
-  void _onLocationSelected(LatLng location) {
+  /// Opens map centered on the chosen saved / recent / search location.
+  void _openMapAt(LatLng location, {String? label}) {
     setState(() {
       _selectedLocation = location;
       _showMap = true;
     });
   }
 
+  void _onPlacePicked(LatLng location, {String? label}) {
+    // Always show pin map at the tapped place (saved / recent / search).
+    _openMapAt(location, label: label);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_showMap) {
       return LocationMapScreen(
+        key: ValueKey(
+          '${_selectedLocation.latitude},${_selectedLocation.longitude}',
+        ),
         initialLocation: _selectedLocation,
         forHomeLocation: widget.forHomeLocation,
         onBack: () {
@@ -55,7 +63,8 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
     }
 
     return LocationSearchScreen(
-      onLocationSelected: _onLocationSelected,
+      onLocationSelected: _onPlacePicked,
+      onOpenMapAt: _openMapAt,
       forHomeLocation: widget.forHomeLocation,
     );
   }
@@ -63,11 +72,15 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
 
 /// First screen: Location search with saved places and recent searches
 class LocationSearchScreen extends StatefulWidget {
-  final Function(LatLng) onLocationSelected;
+  /// Saved / recent / search result picked.
+  final void Function(LatLng location, {String? label}) onLocationSelected;
+  /// Force open map (e.g. Use current location → pin).
+  final void Function(LatLng location, {String? label}) onOpenMapAt;
   final bool forHomeLocation;
 
   const LocationSearchScreen({
     required this.onLocationSelected,
+    required this.onOpenMapAt,
     required this.forHomeLocation,
     super.key,
   });
@@ -80,11 +93,34 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   late TextEditingController _searchController;
   List<LocationSuggestion> _suggestions = [];
   bool _searching = false;
+  List<Map<String, dynamic>> _recentSearches = [];
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _loadRecentSearches();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    await RecentLocationsStore.ensureLoaded();
+    if (!mounted) return;
+    setState(() => _recentSearches = List.from(RecentLocationsStore.items));
+  }
+
+  Future<void> _rememberSearch({
+    required String name,
+    required LatLng location,
+    String? subtitle,
+  }) async {
+    await RecentLocationsStore.add(
+      name: name,
+      lat: location.latitude,
+      lng: location.longitude,
+      subtitle: subtitle,
+    );
+    if (!mounted) return;
+    setState(() => _recentSearches = List.from(RecentLocationsStore.items));
   }
 
   @override
@@ -114,16 +150,83 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   double _parseLatLngValue(dynamic value, [double fallback = 0.0]) {
     if (value is double) return value;
     if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? fallback;
+    if (value is String) return double.tryParse(value.trim()) ?? fallback;
     return fallback;
   }
 
-  double _resolveLat(Map<String, dynamic> item, [double fallback = 0.0]) {
-    return _parseLatLngValue(item['latitude'] ?? item['lat'], fallback);
+  /// Pull lat/lng from common API shapes used by saved addresses.
+  LatLng? _latLngFromAddress(Map<String, dynamic> address) {
+    dynamic lat = address['latitude'] ??
+        address['lat'] ??
+        address['Latitude'] ??
+        address['locationLatitude'];
+    dynamic lng = address['longitude'] ??
+        address['lng'] ??
+        address['long'] ??
+        address['Longitude'] ??
+        address['locationLongitude'];
+
+    final nested = address['location'] ??
+        address['geoLocation'] ??
+        address['geo'] ??
+        address['coordinates'];
+    if (nested is Map) {
+      lat ??= nested['latitude'] ?? nested['lat'] ?? nested['Latitude'];
+      lng ??= nested['longitude'] ?? nested['lng'] ?? nested['long'] ?? nested['Longitude'];
+      final coords = nested['coordinates'];
+      if ((lat == null || lng == null) && coords is List && coords.length >= 2) {
+        // GeoJSON: [lng, lat]
+        lng ??= coords[0];
+        lat ??= coords[1];
+      }
+    } else if (nested is List && nested.length >= 2) {
+      lng ??= nested[0];
+      lat ??= nested[1];
+    }
+
+    final parsedLat = _parseLatLngValue(lat, double.nan);
+    final parsedLng = _parseLatLngValue(lng, double.nan);
+    if (!parsedLat.isFinite || !parsedLng.isFinite) return null;
+    if (parsedLat == 0 && parsedLng == 0) return null;
+    return LatLng(parsedLat, parsedLng);
   }
 
-  double _resolveLng(Map<String, dynamic> item, [double fallback = 0.0]) {
-    return _parseLatLngValue(item['longitude'] ?? item['lng'], fallback);
+  Future<LatLng?> _geocodeAddressText(String query) async {
+    if (query.trim().isEmpty) return null;
+    final results = await _searchLocationsFromGoogle(query);
+    if (results.isEmpty) return null;
+    return results.first.location;
+  }
+
+  Future<void> _openSavedPlaceOnMap(Map<String, dynamic> address) async {
+    final label = (address['label'] ?? 'Address').toString();
+    final addressParts = <String>[
+      address['addressLine1']?.toString() ?? '',
+      address['addressLine2']?.toString() ?? '',
+      address['city']?.toString() ?? '',
+      address['state']?.toString() ?? '',
+      address['pincode']?.toString() ?? '',
+    ].where((part) => part.isNotEmpty).toList();
+    final subtitle =
+        addressParts.isNotEmpty ? addressParts.join(', ') : null;
+    final displayLabel = subtitle != null ? '$label · $subtitle' : label;
+
+    // Same path as recent search: resolve a LatLng, then open pin map there.
+    var location = _latLngFromAddress(address);
+    location ??= await _geocodeAddressText(
+      addressParts.isNotEmpty ? addressParts.join(', ') : label,
+    );
+
+    if (!mounted) return;
+    if (location != null) {
+      widget.onLocationSelected(location, label: displayLabel);
+    } else {
+      // Last resort: still open map (better than silent no-op).
+      widget.onOpenMapAt(
+        LatLng(ApiConfig.lat, ApiConfig.lng),
+        label: displayLabel,
+      );
+    }
   }
 
   Future<List<LocationSuggestion>> _searchLocationsFromGoogle(String query) async {
@@ -172,7 +275,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     final pos = await LocationService.currentPosition();
     final lat = pos?.latitude ?? ApiConfig.fallbackLat;
     final lng = pos?.longitude ?? ApiConfig.fallbackLng;
-    widget.onLocationSelected(LatLng(lat, lng));
+    // Always open map so user can confirm / adjust the pin.
+    widget.onOpenMapAt(LatLng(lat, lng));
   }
 
   @override
@@ -398,12 +502,28 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                         _resultsCard(
                           children: List.generate(_suggestions.length, (index) {
                             final suggestion = _suggestions[index];
+                            final displayLabel =
+                                suggestion.subtitle != null &&
+                                        suggestion.subtitle!.isNotEmpty
+                                    ? '${suggestion.name} · ${suggestion.subtitle}'
+                                    : suggestion.name;
                             return _buildLocationTile(
                               suggestion.name,
                               suggestion.location,
                               null,
                               subtitle: suggestion.subtitle,
                               showDivider: index < _suggestions.length - 1,
+                              onTap: () async {
+                                await _rememberSearch(
+                                  name: suggestion.name,
+                                  location: suggestion.location,
+                                  subtitle: suggestion.subtitle,
+                                );
+                                widget.onLocationSelected(
+                                  suggestion.location,
+                                  label: displayLabel,
+                                );
+                              },
                             );
                           }),
                         ),
@@ -453,11 +573,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     String? distance, {
     String? subtitle,
     bool showDivider = false,
+    VoidCallback? onTap,
   }) {
+    final displayLabel = subtitle != null && subtitle.isNotEmpty
+        ? '$title · $subtitle'
+        : title;
     return Column(
       children: [
         InkWell(
-          onTap: () => widget.onLocationSelected(location),
+          onTap: onTap ??
+              () => widget.onLocationSelected(location, label: displayLabel),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -534,17 +659,17 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
         address['city']?.toString() ?? '',
       ].where((part) => part.isNotEmpty).toList();
       final subtitle = addressParts.isNotEmpty ? addressParts.join(', ') : null;
-      final location = LatLng(
-        _resolveLat(address, ApiConfig.lat),
-        _resolveLng(address, ApiConfig.lng),
-      );
+      // Prefer real saved coords; geocode on tap if missing (same map pin flow as recent).
+      final known = _latLngFromAddress(address) ??
+          const LatLng(17.434933, 78.388254);
 
       return _buildLocationTile(
         label,
-        location,
+        known,
         null,
         subtitle: subtitle,
         showDivider: showDivider,
+        onTap: () => _openSavedPlaceOnMap(address),
       );
     }
 
@@ -582,27 +707,31 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
         const SizedBox(height: 18),
         _sectionLabel('RECENT SEARCHES'),
         const SizedBox(height: 8),
-        _resultsCard(
-          children: [
-            _buildLocationTile(
-              "Doctor's Colony",
-              const LatLng(17.430000, 78.388254),
-              '0.4 km',
-              showDivider: true,
+        if (_recentSearches.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text(
+              'Places you search will show up here',
+              style: AppText.body(size: 12.5, color: AppColors.bodyGrey),
             ),
-            _buildLocationTile(
-              'Hitech City Metro',
-              const LatLng(17.435000, 78.440000),
-              '2.1 km',
-              showDivider: true,
-            ),
-            _buildLocationTile(
-              'Inorbit Mall',
-              const LatLng(17.450000, 78.450000),
-              '1.8 km',
-            ),
-          ],
-        ),
+          )
+        else
+          _resultsCard(
+            children: List.generate(_recentSearches.length, (index) {
+              final item = _recentSearches[index];
+              final name = (item['name'] ?? 'Recent').toString();
+              final subtitle = item['subtitle']?.toString();
+              final lat = (item['lat'] as num).toDouble();
+              final lng = (item['lng'] as num).toDouble();
+              return _buildLocationTile(
+                name,
+                LatLng(lat, lng),
+                null,
+                subtitle: subtitle,
+                showDivider: index < _recentSearches.length - 1,
+              );
+            }),
+          ),
       ],
     );
   }
@@ -657,45 +786,69 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
 
   Future<void> _confirm() async {
     setState(() => _loading = true);
-    final resolved = await LocationService.resolveAddressDetails(_target.latitude, _target.longitude);
+    final resolved = await LocationService.resolveAddressDetails(
+      _target.latitude,
+      _target.longitude,
+    );
+    // Always use the final pin’s place name (not the tapped search/saved label).
+    final shortName = await LocationService.reverseGeocode(
+      _target.latitude,
+      _target.longitude,
+    );
     if (!mounted) return;
 
+    final line1 = resolved.addressLine1.trim();
+    final city = resolved.city.trim();
+    final label = (shortName != null && shortName.trim().isNotEmpty)
+        ? shortName.trim()
+        : (line1.isNotEmpty
+            ? (city.isNotEmpty && city != 'Your city' ? '$line1, $city' : line1)
+            : (city.isNotEmpty ? city : 'Pinned location'));
+
     if (widget.forHomeLocation) {
-      // Update home location in ApiConfig
-      ApiConfig.setLocation(
-        latitude: _target.latitude,
-        longitude: _target.longitude,
-        label: resolved.addressLine1,
-      );
-      // Reset the flag
       try {
-        final appController = ProviderScope.containerOf(context).read(appControllerProvider);
-        appController.selectLocationForHome = false;
-        // Refresh nearby restaurants with new location
-        appController.refreshLocationAndNearby();
-        // Return to home screen
-        appController.back();
+        final app =
+            ProviderScope.containerOf(context).read(appControllerProvider);
+        await RecentLocationsStore.add(
+          name: label,
+          lat: _target.latitude,
+          lng: _target.longitude,
+          subtitle: line1.isNotEmpty && line1 != label ? line1 : null,
+        );
+        // Apply pin coords + confirmed place name only — no GPS overwrite.
+        await app.applyHomeLocation(
+          latitude: _target.latitude,
+          longitude: _target.longitude,
+          label: label,
+        );
+        app.back();
       } catch (_) {
-        Navigator.of(context).pop();
+        if (mounted) Navigator.of(context).pop();
+      } finally {
+        if (mounted) setState(() => _loading = false);
       }
     } else {
       setState(() => _loading = false);
-      // Open add-address details screen (Navigator push to retain main stack)
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddAddressDetailsScreen(
-        latitude: _target.latitude,
-        longitude: _target.longitude,
-        resolved: resolved,
-      )));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AddAddressDetailsScreen(
+            latitude: _target.latitude,
+            longitude: _target.longitude,
+            resolved: resolved,
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isWide = AppResponsive.of(context).isWide;
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final bottomOffset = bottomInset + (isWide ? 24.0 : 24.0);
+    // Keep confirm card above safe area (dock is hidden on select-location).
+    final bottomOffset = bottomInset + 20.0;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
           'Pin exact location',
@@ -718,11 +871,21 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
       body: Stack(
         children: [
           GoogleMap(
-            initialCameraPosition: CameraPosition(target: _target, zoom: 17),
-            onMapCreated: (c) => _ctl.complete(c),
+            initialCameraPosition: CameraPosition(
+              target: widget.initialLocation,
+              zoom: 17,
+            ),
+            onMapCreated: (c) async {
+              if (!_ctl.isCompleted) _ctl.complete(c);
+              // Ensure camera lands on the selected saved/recent/search point.
+              await c.animateCamera(
+                CameraUpdate.newLatLngZoom(widget.initialLocation, 17),
+              );
+            },
             onCameraMove: _onCameraMove,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
+            padding: EdgeInsets.only(bottom: bottomOffset + 110),
           ),
           const Center(
             child: Padding(
@@ -734,9 +897,7 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
             left: 16,
             right: 16,
             bottom: bottomOffset,
-            child: SafeArea(
-              top: false,
-              child: Container(
+            child: Container(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -795,7 +956,6 @@ class _LocationMapScreenState extends State<LocationMapScreen> {
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),

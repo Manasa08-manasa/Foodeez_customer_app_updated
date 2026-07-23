@@ -232,7 +232,38 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refreshLocationAndNearby() async {
-    await LocationService.ensureLocation();
+    await LocationService.ensureLocation(force: true);
+    store.shortAddress = ApiConfig.locationLabel;
+    await AppRepository.syncRestaurants();
+    notifyListeners();
+  }
+
+  /// Apply a manually chosen delivery/home location and refresh nearby
+  /// restaurants — does NOT re-read device GPS (that was overwriting picks).
+  Future<void> applyHomeLocation({
+    required double latitude,
+    required double longitude,
+    String? label,
+  }) async {
+    ApiConfig.setLocation(
+      latitude: latitude,
+      longitude: longitude,
+      label: label,
+      manual: true,
+    );
+    store.shortAddress = ApiConfig.locationLabel;
+    selectLocationForHome = false;
+    notifyListeners();
+    try {
+      await AppRepository.syncRestaurants();
+    } catch (e) {
+      debugPrint('[AppController] applyHomeLocation sync failed: $e');
+    }
+    if (hasListeners) notifyListeners();
+  }
+
+  /// Refresh nearby list using the already-selected ApiConfig coordinates.
+  Future<void> refreshNearbyOnly() async {
     await AppRepository.syncRestaurants();
     notifyListeners();
   }
@@ -253,7 +284,8 @@ class AppController extends ChangeNotifier {
         ? (city.isNotEmpty ? '$line1, $city' : line1)
         : (address['label']?.toString() ?? 'Saved location');
 
-    ApiConfig.setLocation(latitude: lat, longitude: lng, label: label);
+    ApiConfig.setLocation(latitude: lat, longitude: lng, label: label, manual: true);
+    store.shortAddress = ApiConfig.locationLabel;
     notifyListeners();
   }
 
@@ -1049,6 +1081,8 @@ class AppController extends ChangeNotifier {
     'chat',
     'profile',
     'coupons',
+    'select-location',
+    'address-book',
   };
 
   bool get showTabBar => !hideTabScreens.contains(screen);

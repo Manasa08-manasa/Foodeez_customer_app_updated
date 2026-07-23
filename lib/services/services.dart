@@ -6,5 +6,6 @@ export 'token_store.dart';
 export 'customer_auth_api.dart';
 export 'customer_apis.dart';
 export 'location_service.dart';
+export 'recent_locations_store.dart';
 export 'razorpay_checkout.dart';
 export 'support_chat_service.dart';

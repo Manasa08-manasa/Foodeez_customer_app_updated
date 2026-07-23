@@ -46,13 +46,27 @@ class LocationService {
   }
 
   /// Updates [ApiConfig] lat/lng + label. Always succeeds with fallback.
-  static Future<void> ensureLocation() async {
+  /// Skips GPS overwrite when the user has manually chosen a Home location
+  /// unless [force] is true (e.g. explicit "use current location").
+  static Future<void> ensureLocation({bool force = false}) async {
+    if (ApiConfig.locationManual && !force) {
+      debugPrint(
+        '[Location] keeping manual lat=${ApiConfig.lat} lng=${ApiConfig.lng} '
+        '(${ApiConfig.locationLabel})',
+      );
+      return;
+    }
     final pos = await currentPosition();
     final lat = pos?.latitude ?? ApiConfig.fallbackLat;
     final lng = pos?.longitude ?? ApiConfig.fallbackLng;
     final label = await reverseGeocode(lat, lng) ??
         (pos == null ? 'Hyderabad' : 'Current location');
-    ApiConfig.setLocation(latitude: lat, longitude: lng, label: label);
+    ApiConfig.setLocation(
+      latitude: lat,
+      longitude: lng,
+      label: label,
+      manual: false,
+    );
     debugPrint('[Location] using lat=$lat lng=$lng ($label)');
   }
 

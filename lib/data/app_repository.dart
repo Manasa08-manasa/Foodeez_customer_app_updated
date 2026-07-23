@@ -465,13 +465,34 @@ class AppRepository {
       final ares = await CustomerProfileApi.getAddresses();
       final addrs =
           RemoteMappers.unwrapList(ares, ['addresses', 'results', 'items']);
+      // Normalize lat/lng onto top-level keys so Select Location / Home can pin.
+      final normalized = addrs.map((raw) {
+        final a = Map<String, dynamic>.from(raw);
+        dynamic lat = a['latitude'] ?? a['lat'];
+        dynamic lng = a['longitude'] ?? a['lng'] ?? a['long'];
+        final nested = a['location'] ?? a['geoLocation'] ?? a['geo'];
+        if (nested is Map) {
+          lat ??= nested['latitude'] ?? nested['lat'];
+          lng ??= nested['longitude'] ?? nested['lng'] ?? nested['long'];
+          final coords = nested['coordinates'];
+          if ((lat == null || lng == null) &&
+              coords is List &&
+              coords.length >= 2) {
+            lng ??= coords[0];
+            lat ??= coords[1];
+          }
+        }
+        if (lat != null) a['latitude'] = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
+        if (lng != null) a['longitude'] = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
+        return a;
+      }).toList();
       store.addresses
         ..clear()
-        ..addAll(addrs);
-      if (addrs.isNotEmpty) {
-        final def = addrs.firstWhere(
+        ..addAll(normalized);
+      if (normalized.isNotEmpty) {
+        final def = normalized.firstWhere(
             (a) => a['isDefault'] == true,
-            orElse: () => addrs.first);
+            orElse: () => normalized.first);
         final line1 = (def['addressLine1'] ?? '').toString();
         final city = (def['city'] ?? '').toString();
         if (line1.isNotEmpty) {

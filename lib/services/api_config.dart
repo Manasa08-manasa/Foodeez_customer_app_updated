@@ -20,15 +20,21 @@ class ApiConfig {
   static String locationLabel = 'Finding your location…';
   static bool locationReady = false;
 
+  /// When true, [LocationService.ensureLocation] must not overwrite with GPS
+  /// (user picked saved place / search / map pin for Home).
+  static bool locationManual = false;
+
   static void setLocation({
     required double latitude,
     required double longitude,
     String? label,
+    bool? manual,
   }) {
     lat = latitude;
     lng = longitude;
     if (label != null && label.isNotEmpty) locationLabel = label;
     locationReady = true;
+    if (manual != null) locationManual = manual;
   }
 
   static const Duration timeout = Duration(seconds: 20);
