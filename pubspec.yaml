@@ -57,10 +57,10 @@ flutter_launcher_icons:
     generate: true
   web:
     generate: true
-  image_path: assets/images/logo_customer.png
+  image_path: assets/images/Foodeez_logo_1.png
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/images/logo_customer.png
-  adaptive_icon_foreground_inset: 18
+  adaptive_icon_foreground: assets/images/Foodeez_logo_1.png
+  adaptive_icon_foreground_inset: 17
 
 flutter_native_splash:
   color: "#2A0E1C"
