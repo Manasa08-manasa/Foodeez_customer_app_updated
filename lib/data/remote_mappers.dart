@@ -40,7 +40,10 @@ class RemoteMappers {
       }
     }
     if (list is! List) return const [];
-    return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return list
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   static String _str(Map m, List<String> keys, [String fallback = '']) {
@@ -75,7 +78,14 @@ class RemoteMappers {
     final first = photos.first;
     if (first is String && first.isNotEmpty) return first;
     if (first is Map) {
-      final url = _str(first, ['url', 'imageUrl', 'image_url', 'src', 'path', 'key']);
+      final url = _str(first, [
+        'url',
+        'imageUrl',
+        'image_url',
+        'src',
+        'path',
+        'key',
+      ]);
       return url.isEmpty ? null : url;
     }
     return null;
@@ -139,7 +149,8 @@ class RemoteMappers {
         normalized['brandDescription'] ??= n['brandDescription'];
         normalized['restaurantId'] ??= n['id'];
       }
-      normalized['imageUrl'] = j['imageUrl'] ??
+      normalized['imageUrl'] =
+          j['imageUrl'] ??
           j['image_url'] ??
           j['coverPhotoUrl'] ??
           j['coverPhoto'] ??
@@ -160,24 +171,37 @@ class RemoteMappers {
         j['cuisines'] ?? j['cuisine'] ?? j['cuisineTypes'] ?? j['cuisineTags'];
     String cuisines;
     if (cuisinesRaw is List) {
-      cuisines = cuisinesRaw.map((e) {
-        if (e is Map) {
-          return (e['name'] ?? e['label'] ?? e['tag'] ?? e['title'] ?? '')
-              .toString();
-        }
-        return e.toString();
-      }).where((s) => s.isNotEmpty).join(' · ');
+      cuisines = cuisinesRaw
+          .map((e) {
+            if (e is Map) {
+              return (e['name'] ?? e['label'] ?? e['tag'] ?? e['title'] ?? '')
+                  .toString();
+            }
+            return e.toString();
+          })
+          .where((s) => s.isNotEmpty)
+          .join(' · ');
       if (cuisines.isEmpty) cuisines = 'Multi-cuisine';
     } else {
       cuisines = cuisinesRaw?.toString() ?? 'Multi-cuisine';
     }
 
-    final mins = _num(j, ['deliveryTime', 'estimatedDeliveryTime', 'avgDeliveryTime', 'etaMinutes'], 0);
+    final mins = _num(j, [
+      'deliveryTime',
+      'estimatedDeliveryTime',
+      'avgDeliveryTime',
+      'etaMinutes',
+    ], 0);
     final time = mins > 0
         ? '${mins.round()}-${mins.round() + 5} min'
         : _str(j, ['deliveryTimeText', 'eta'], '30-35 min');
 
-    final priceForTwo = _num(j, ['priceForTwo', 'costForTwo', 'avgCostForTwo'], 0);
+    final priceForTwo = _num(j, [
+      'priceForTwo',
+      'costForTwo',
+      'avgCostForTwo',
+      'averageCostMin',
+    ], 0);
     final distKm = _num(j, ['distance', 'distanceKm', 'distanceInKm'], 0);
     final deliveryFee = _num(j, ['deliveryFee', 'delivery_fee'], -1);
 
@@ -192,25 +216,44 @@ class RemoteMappers {
       cuisines: cuisines,
       rating: _num(j, ['rating', 'avgRating', 'averageRating'], 4.0),
       time: time,
-      price: priceForTwo > 0 ? '₹${priceForTwo.round()} for two' : '₹300 for two',
+      price: priceForTwo > 0
+          ? '₹${priceForTwo.round()} for two'
+          : '₹300 for two',
       dist: distKm > 0 ? '${distKm.toStringAsFixed(1)} km' : '—',
-      offer: _str(j, ['offer', 'offerText', 'promoText'],
-          deliveryFee >= 0 ? (deliveryFee == 0 ? 'Free delivery' : 'Delivery ₹${deliveryFee.round()}') : ''),
+      offer: _str(
+        j,
+        ['offer', 'offerText', 'promoText'],
+        _bool(j, ['offersAvailable'])
+            ? 'Offers available'
+            : (deliveryFee >= 0
+                  ? (deliveryFee == 0
+                        ? 'Free delivery'
+                        : 'Delivery ₹${deliveryFee.round()}')
+                  : ''),
+      ),
       veg: _bool(j, ['isVeg', 'veg', 'isPureVeg']),
-      photoKey: resolveMediaUrl(_str(j, [
-                'imageUrl',
-                'image_url',
-                'coverPhotoUrl',
-                'coverImage',
-                'image',
-                'photo',
-                'banner',
-                'thumbnail',
-              ], '')) ??
+      photoKey:
+          resolveMediaUrl(
+            _str(j, [
+              'imageUrl',
+              'image_url',
+              'coverPhotoUrl',
+              'coverImage',
+              'image',
+              'photo',
+              'banner',
+              'thumbnail',
+            ], ''),
+          ) ??
           _firstPhotoUrl(j['storePhotos']) ??
+          _firstPhotoUrl(j['gallery']) ??
           'biryani',
       isOpen: _bool(j, ['isOnline', 'isOpen', 'isActive', 'open'], true),
       galleryPhotoKeys: galleryKeys,
+      maxGuests: _num(j, [
+        'maxGuestsPerReservation',
+        'maxGuests',
+      ], 20).round().clamp(1, 100),
     );
   }
 
@@ -232,50 +275,74 @@ class RemoteMappers {
       final isInStock = _bool(m, ['isInStock', 'inStock', 'available'], true);
       final autoOutOfStock = _bool(m, ['autoOutOfStock'], false);
 
-      out.add(MenuItem(
-        id: _str(m, ['id', '_id', 'menuItemId'], 'item-${out.length}'),
-        section: section,
-        name: _str(m, ['name', 'itemName'], 'Item'),
-        desc: _str(m, ['description', 'desc'], ''),
-        price: _num(m, ['price', 'sellingPrice', 'amount'], 0).round(),
-        veg: _bool(m, ['isVeg', 'veg']),
-        rating: _num(m, ['rating', 'avgRating'], 4.2),
-        ratingsCount: _str(m, ['ratingsCount', 'ratingCount', 'totalRatings'], ''),
-        bestseller: _bool(m, ['isBestseller', 'bestseller', 'isRecommended']),
-        photoKey: resolveMediaUrl(_str(m, [
-          'imageUrl',
-          'image_url',
-          'image',
-          'photo',
-          'thumbnail',
-        ], 'biryani')) ??
-        'biryani',
-        isInStock: isInStock,
-        autoOutOfStock: autoOutOfStock,
-        isVisible: isVisible,
-      ));
+      out.add(
+        MenuItem(
+          id: _str(m, ['id', '_id', 'menuItemId'], 'item-${out.length}'),
+          section: section,
+          name: _str(m, ['name', 'itemName'], 'Item'),
+          desc: _str(m, ['description', 'desc'], ''),
+          price: _num(m, ['price', 'sellingPrice', 'amount'], 0).round(),
+          veg: _bool(m, ['isVeg', 'veg']),
+          rating: _num(m, ['rating', 'avgRating'], 4.2),
+          ratingsCount: _str(m, [
+            'ratingsCount',
+            'ratingCount',
+            'totalRatings',
+          ], ''),
+          bestseller: _bool(m, ['isBestseller', 'bestseller', 'isRecommended']),
+          photoKey:
+              resolveMediaUrl(
+                _str(m, [
+                  'imageUrl',
+                  'image_url',
+                  'image',
+                  'photo',
+                  'thumbnail',
+                ], 'biryani'),
+              ) ??
+              'biryani',
+          isInStock: isInStock,
+          autoOutOfStock: autoOutOfStock,
+          isVisible: isVisible,
+        ),
+      );
     }
 
     dynamic groups = payload;
     if (payload is Map) {
-      groups = payload['menu'] ?? payload['categories'] ?? payload['sections'] ?? payload['items'];
+      groups =
+          payload['menu'] ??
+          payload['categories'] ??
+          payload['sections'] ??
+          payload['items'];
     }
     if (groups is! List) return out;
 
     for (final g in groups.whereType<Map>()) {
       final items = g['items'] ?? g['menuItems'];
       if (items is List) {
-        final section = _str(
-          g,
-          ['displayName', 'name', 'category', 'categoryName', 'section', 'title'],
-          'Recommended',
-        );
+        final section = _str(g, [
+          'displayName',
+          'name',
+          'category',
+          'categoryName',
+          'section',
+          'title',
+        ], 'Recommended');
         for (final it in items.whereType<Map>()) {
           addItem(it, section);
         }
       } else {
         // flat item list
-        addItem(g, _str(g, ['displayName', 'category', 'categoryName', 'section'], 'Recommended'));
+        addItem(
+          g,
+          _str(g, [
+            'displayName',
+            'category',
+            'categoryName',
+            'section',
+          ], 'Recommended'),
+        );
       }
     }
     return out;
@@ -297,18 +364,22 @@ class RemoteMappers {
     final value = _num(j, ['discountValue', 'value'], 0).round();
 
     final ridsRaw = j['restaurantIds'] ?? j['restaurants'];
-    final rids = ridsRaw is List ? ridsRaw.map((e) => e.toString()).toList() : <String>[];
+    final rids = ridsRaw is List
+        ? ridsRaw.map((e) => e.toString()).toList()
+        : <String>[];
     final singleRid = _str(j, ['restaurantId'], '');
     if (singleRid.isNotEmpty && !rids.contains(singleRid)) rids.add(singleRid);
 
     final isRestaurantScoped =
         _str(j, ['scope'], '').toUpperCase() == 'RESTAURANT' ||
-            (singleRid.isNotEmpty && _str(j, ['scope'], '').isEmpty);
+        (singleRid.isNotEmpty && _str(j, ['scope'], '').isEmpty);
 
     final title = _str(
       j,
       ['title'],
-      isPercent ? '$value% OFF' : (type == 'FREE_DELIVERY' ? 'Free Delivery' : '₹$value OFF'),
+      isPercent
+          ? '$value% OFF'
+          : (type == 'FREE_DELIVERY' ? 'Free Delivery' : '₹$value OFF'),
     );
 
     return Coupon(
@@ -316,7 +387,9 @@ class RemoteMappers {
       title: title,
       subtitle: _str(j, ['description', 'subtitle'], ''),
       scope: isRestaurantScoped ? CouponScope.restaurant : CouponScope.global,
-      discountType: isPercent ? CouponDiscountType.percent : CouponDiscountType.flat,
+      discountType: isPercent
+          ? CouponDiscountType.percent
+          : CouponDiscountType.flat,
       discountValue: value,
       maxDiscount: _num(j, ['maxDiscountCap', 'maxDiscount'], 0).round(),
       minOrderValue: _num(j, ['minOrderValue', 'minOrder'], 0).round(),
@@ -347,10 +420,24 @@ class RemoteMappers {
     String when = _str(j, ['createdAt', 'placedAt', 'orderDate'], '');
     final dt = DateTime.tryParse(when);
     if (dt != null) {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
       final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-      when = '${dt.day} ${months[dt.month - 1]} · $h:${dt.minute.toString().padLeft(2, '0')} $ampm';
+      when =
+          '${dt.day} ${months[dt.month - 1]} · $h:${dt.minute.toString().padLeft(2, '0')} $ampm';
     }
 
     final rest = j['restaurant'] ?? j['branch'];
@@ -362,7 +449,12 @@ class RemoteMappers {
       id: _str(j, ['orderNumber', 'id', '_id'], 'FZ0000'),
       restaurantId: restId,
       items: items,
-      total: _num(j, ['grandTotal', 'total', 'totalAmount', 'amount'], 0).round(),
+      total: _num(j, [
+        'grandTotal',
+        'total',
+        'totalAmount',
+        'amount',
+      ], 0).round(),
       when: when,
       rating: _num(j, ['rating', 'customerRating'], 0).round(),
     );

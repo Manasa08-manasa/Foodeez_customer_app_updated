@@ -25,10 +25,18 @@ class BookingScreen extends ConsumerWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                FoodImage(photoKey: rest.photoKey, width: double.infinity, height: 154),
+                FoodImage(
+                  photoKey: rest.photoKey,
+                  width: double.infinity,
+                  height: 154,
+                ),
                 Container(
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0x4D000000), Colors.transparent]),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x4D000000), Colors.transparent],
+                    ),
                   ),
                 ),
                 SafeArea(
@@ -37,7 +45,10 @@ class BookingScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(12),
                     child: Align(
                       alignment: Alignment.topLeft,
-                      child: CircleIconButton(icon: Icons.arrow_back_ios_new, onTap: app.back),
+                      child: CircleIconButton(
+                        icon: Icons.arrow_back_ios_new,
+                        onTap: app.back,
+                      ),
                     ),
                   ),
                 ),
@@ -51,21 +62,54 @@ class BookingScreen extends ConsumerWidget {
               children: [
                 Text(rest.name, style: AppText.display(size: 21)),
                 const SizedBox(height: 2),
-                Text('${rest.cuisines} · ${rest.dist}', style: AppText.body(size: 13, weight: FontWeight.w500, color: AppColors.bodyGrey)),
+                Text(
+                  '${rest.cuisines} · ${rest.dist}',
+                  style: AppText.body(
+                    size: 13,
+                    weight: FontWeight.w500,
+                    color: AppColors.bodyGrey,
+                  ),
+                ),
                 const SizedBox(height: 22),
 
                 Text('Number of guests', style: AppText.display(size: 15)),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.chipBorder, width: 1.5), borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.chipBorder, width: 1.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _circleBtn(icon: Icons.remove, filled: false, onTap: app.decG),
-                      Text('${app.bGuests} ${app.bGuests == 1 ? 'guest' : 'guests'}', style: AppText.body(size: 15, weight: FontWeight.w700)),
-                      _circleBtn(icon: Icons.add, filled: true, onTap: app.incG),
+                      _circleBtn(
+                        icon: Icons.remove,
+                        filled: false,
+                        onTap: app.decG,
+                      ),
+                      Text(
+                        '${app.bGuests} ${app.bGuests == 1 ? 'guest' : 'guests'}',
+                        style: AppText.body(size: 15, weight: FontWeight.w700),
+                      ),
+                      _circleBtn(
+                        icon: Icons.add,
+                        filled: true,
+                        onTap: app.incG,
+                      ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Up to ${app.bookingMaxGuests} guests per reservation',
+                  style: AppText.body(
+                    size: 11.5,
+                    weight: FontWeight.w500,
+                    color: AppColors.bodyGrey,
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -78,7 +122,11 @@ class BookingScreen extends ConsumerWidget {
                     scrollDirection: Axis.horizontal,
                     itemCount: bookingDates.length,
                     separatorBuilder: (context, _) => const SizedBox(width: 9),
-                    itemBuilder: (context, i) => _Chip(label: bookingDates[i], selected: app.bDateIdx == i, onTap: () => app.setBDate(i)),
+                    itemBuilder: (context, i) => _Chip(
+                      label: bookingDates[i],
+                      selected: app.bDateIdx == i,
+                      onTap: () => app.setBDate(i),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -88,8 +136,14 @@ class BookingScreen extends ConsumerWidget {
                 Wrap(
                   spacing: 9,
                   runSpacing: 9,
-                  children: List.generate(bookingTimes.length, (i) =>
-                      _Chip(label: bookingTimes[i], selected: app.bTimeIdx == i, onTap: () => app.setBTime(i))),
+                  children: List.generate(
+                    bookingTimes.length,
+                    (i) => _Chip(
+                      label: bookingTimes[i],
+                      selected: app.bTimeIdx == i,
+                      onTap: () => app.setBTime(i),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 22),
 
@@ -98,11 +152,21 @@ class BookingScreen extends ConsumerWidget {
                   fillColor: AppColors.dashedBookingBg,
                   child: Row(
                     children: [
-                      const Icon(Icons.confirmation_number_outlined, size: 16, color: AppColors.accent),
+                      const Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 16,
+                        color: AppColors.accent,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('Flat 25% off on your total bill when you dine out',
-                            style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.accent)),
+                        child: Text(
+                          'Flat 25% off on your total bill when you dine out',
+                          style: AppText.body(
+                            size: 13,
+                            weight: FontWeight.w700,
+                            color: AppColors.accent,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -110,27 +174,49 @@ class BookingScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: AppColors.paleWarmBg, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(
+                    color: AppColors.paleWarmBg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Booking fee', style: AppText.body(size: 14, weight: FontWeight.w700)),
-                          Text('₹$bookingFee', style: AppText.body(size: 14, weight: FontWeight.w800)),
+                          Text(
+                            'Booking fee',
+                            style: AppText.body(
+                              size: 14,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '₹$bookingFee',
+                            style: AppText.body(
+                              size: 14,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Fully refundable if you cancel at least 3 hours before your slot',
-                        style: AppText.body(size: 12, weight: FontWeight.w500, color: AppColors.bodyGrey),
+                        style: AppText.body(
+                          size: 12,
+                          weight: FontWeight.w500,
+                          color: AppColors.bodyGrey,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                PrimaryButton(label: 'Pay ₹$bookingFee & Reserve', onTap: app.goToBookingPayment),
+                PrimaryButton(
+                  label: 'Pay ₹$bookingFee & Reserve',
+                  onTap: app.goToBookingPayment,
+                ),
                 const SizedBox(height: 12),
               ],
             ),
@@ -140,7 +226,11 @@ class BookingScreen extends ConsumerWidget {
     );
   }
 
-  Widget _circleBtn({required IconData icon, required bool filled, required VoidCallback onTap}) {
+  Widget _circleBtn({
+    required IconData icon,
+    required bool filled,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -149,9 +239,15 @@ class BookingScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: filled ? AppColors.accent : Colors.transparent,
-          border: filled ? null : Border.all(color: AppColors.accent, width: 1.5),
+          border: filled
+              ? null
+              : Border.all(color: AppColors.accent, width: 1.5),
         ),
-        child: Icon(icon, size: 18, color: filled ? Colors.white : AppColors.accent),
+        child: Icon(
+          icon,
+          size: 18,
+          color: filled ? Colors.white : AppColors.accent,
+        ),
       ),
     );
   }
@@ -161,7 +257,11 @@ class _Chip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _Chip({required this.label, required this.selected, required this.onTap});
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -171,10 +271,20 @@ class _Chip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.accent : Colors.white,
-          border: Border.all(color: selected ? AppColors.accent : AppColors.chipBorder, width: 1.5),
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.chipBorder,
+            width: 1.5,
+          ),
           borderRadius: BorderRadius.circular(11),
         ),
-        child: Text(label, style: AppText.body(size: 13, weight: FontWeight.w700, color: selected ? Colors.white : AppColors.ink)),
+        child: Text(
+          label,
+          style: AppText.body(
+            size: 13,
+            weight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.ink,
+          ),
+        ),
       ),
     );
   }

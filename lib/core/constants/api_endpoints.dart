@@ -20,6 +20,9 @@ class ApiEndpoints {
   static const discoveryTrending = '/customer/discovery/trending';
   static const discoveryPopularDishes = '/customer/discovery/popular-dishes';
 
+  // ── Dine-in ───────────────────────────────────────────────────────────────
+  static const dineIn = '/customer/discovery/dinein';
+
   static String restaurantDetails(String branchId) =>
       '/customer/discovery/restaurants/$branchId';
 
@@ -35,8 +38,10 @@ class ApiEndpoints {
   // ── Orders ─────────────────────────────────────────────────────────────────
   static const orders = '/customer/orders';
   static String order(String orderId) => '/customer/orders/$orderId';
-  static String orderCancel(String orderId) => '/customer/orders/$orderId/cancel';
-  static String orderReorder(String orderId) => '/customer/orders/$orderId/reorder';
+  static String orderCancel(String orderId) =>
+      '/customer/orders/$orderId/cancel';
+  static String orderReorder(String orderId) =>
+      '/customer/orders/$orderId/reorder';
   static String orderTracking(String orderId) =>
       '/customer/orders/$orderId/tracking';
 

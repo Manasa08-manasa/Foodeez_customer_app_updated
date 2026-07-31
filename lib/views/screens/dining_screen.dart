@@ -1,16 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/mock_data.dart';
+import '../../data/remote_mappers.dart';
+import '../../models/restaurant.dart';
 import '../../controllers/providers.dart';
 import '../../core/responsive.dart';
+import '../../services/api_config.dart';
+import '../../services/customer_apis.dart';
+import '../../services/api_client.dart';
 import '../../theme.dart';
 import '../widgets/common.dart';
 
-class DiningScreen extends ConsumerWidget {
+class DiningScreen extends ConsumerStatefulWidget {
   const DiningScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DiningScreen> createState() => _DiningScreenState();
+}
+
+class _DiningScreenState extends ConsumerState<DiningScreen> {
+  late Future<List<Restaurant>> _restaurants;
+
+  @override
+  void initState() {
+    super.initState();
+    _restaurants = _loadRestaurants();
+  }
+
+  Future<List<Restaurant>> _loadRestaurants() async {
+    final response = await CustomerDineInApi.nearby(
+      lat: ApiConfig.lat,
+      lng: ApiConfig.lng,
+    );
+    return RemoteMappers.discoveryRestaurants(response);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final app = ref.watch(appControllerProvider);
     final pad = AppResponsive.of(context).pagePadding;
 
@@ -28,8 +54,18 @@ class DiningScreen extends ConsumerWidget {
                   child: Container(
                     width: 38,
                     height: 38,
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.cardBorder, width: 1.5)),
-                    child: const Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.ink),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.cardBorder,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 18,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -38,7 +74,14 @@ class DiningScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Dining Out', style: AppText.display(size: 17)),
-                      Text('Table booking & great offers', style: AppText.body(size: 12.5, weight: FontWeight.w500, color: AppColors.bodyGrey)),
+                      Text(
+                        'Table booking & great offers',
+                        style: AppText.body(
+                          size: 12.5,
+                          weight: FontWeight.w500,
+                          color: AppColors.bodyGrey,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -47,138 +90,350 @@ class DiningScreen extends ConsumerWidget {
                   child: Container(
                     width: 40,
                     height: 40,
-                    decoration: BoxDecoration(color: AppColors.avatarBg, shape: BoxShape.circle, border: Border.all(color: AppColors.avatarBorder, width: 1.5)),
+                    decoration: BoxDecoration(
+                      color: AppColors.avatarBg,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.avatarBorder,
+                        width: 1.5,
+                      ),
+                    ),
                     alignment: Alignment.center,
-                    child: Text(userInitials, style: AppText.body(size: 15, weight: FontWeight.w800, color: AppColors.accent)),
+                    child: Text(
+                      userInitials,
+                      style: AppText.body(
+                        size: 15,
+                        weight: FontWeight.w800,
+                        color: AppColors.accent,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            DeliveryDiningToggle(isDelivery: false, onDelivery: app.toHome, onDining: () {}),
+            DeliveryDiningToggle(
+              isDelivery: false,
+              onDelivery: app.toHome,
+              onDining: () {},
+            ),
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
               padding: EdgeInsets.all(pad),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.accentLight, AppColors.accent], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: const LinearGradient(
+                  colors: [AppColors.accentLight, AppColors.accent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Flat 25% OFF', style: AppText.display(size: 22, color: Colors.white)),
+                  Text(
+                    'Flat 25% OFF',
+                    style: AppText.display(size: 22, color: Colors.white),
+                  ),
                   const SizedBox(height: 6),
-                  Text('on your total bill · dine out at 8,000+ restaurants nearby',
-                      style: AppText.body(size: 13, weight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.95))),
+                  Text(
+                    'on your total bill · dine out at 8,000+ restaurants nearby',
+                    style: AppText.body(
+                      size: 13,
+                      weight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.95),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             Text('Book a table nearby', style: AppText.display(size: 18)),
             const SizedBox(height: 12),
-            ...restaurants.map((r) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () => app.openProfile(r.id),
-                      child: Row(
+            FutureBuilder<List<Restaurant>>(
+              future: _restaurants,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  final message =
+                      snapshot.error is ApiException &&
+                          (snapshot.error as ApiException).statusCode == 401
+                      ? 'Sign in to discover dine-in restaurants nearby'
+                      : 'Unable to load dine-in restaurants';
+                  return _DineInMessage(
+                    message: message,
+                    actionLabel:
+                        snapshot.error is ApiException &&
+                            (snapshot.error as ApiException).statusCode == 401
+                        ? 'Sign in'
+                        : 'Try again',
+                    onTap:
+                        snapshot.error is ApiException &&
+                            (snapshot.error as ApiException).statusCode == 401
+                        ? app.toAccount
+                        : () =>
+                              setState(() => _restaurants = _loadRestaurants()),
+                  );
+                }
+                final nearby = snapshot.data ?? const <Restaurant>[];
+                if (nearby.isEmpty) {
+                  return const _DineInMessage(
+                    message: 'No dine-in restaurants found near you',
+                  );
+                }
+                return Column(
+                  children: nearby.map((r) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: 100,
-                            height: 100,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                ClipRRect(borderRadius: BorderRadius.circular(16), child: FoodImage(photoKey: r.photoKey)),
-                                if (r.videoThumbnailKey != null)
-                                  Positioned(
-                                    right: 6,
-                                    bottom: 6,
-                                    child: Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
-                                      child: const Icon(Icons.play_arrow, color: Colors.white, size: 13),
-                                    ),
-                                  ),
-                                Positioned(
-                                  left: 6,
-                                  top: 6,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.photo_camera_outlined, size: 10, color: Colors.white),
-                                        const SizedBox(width: 3),
-                                        Text('${r.gallery.length}', style: AppText.body(size: 9.5, weight: FontWeight.w700, color: Colors.white)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
+                          GestureDetector(
+                            onTap: () => app.openProfile(r.id),
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(child: Text(r.name, style: AppText.body(size: 16, weight: FontWeight.w700))),
-                                    RatingPill(rating: r.rating),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(r.cuisines, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    style: AppText.body(size: 12.5, weight: FontWeight.w500, color: AppColors.bodyGrey)),
-                                const SizedBox(height: 2),
-                                Text('${r.dist} · ${r.price}', style: AppText.body(size: 12.5, weight: FontWeight.w500, color: AppColors.bodyGrey)),
-                                const SizedBox(height: 8),
-                                DashedRect(
-                                  borderColor: AppColors.dashedBookingBorder,
-                                  fillColor: AppColors.dashedBookingBg,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  radius: 9,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                SizedBox(
+                                  width: 100,
+                                  height: 100,
+                                  child: Stack(
+                                    fit: StackFit.expand,
                                     children: [
-                                      const Icon(Icons.confirmation_number_outlined, size: 13, color: AppColors.accent),
-                                      const SizedBox(width: 6),
-                                      Text('25% OFF on total bill', style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.accent)),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: FoodImage(photoKey: r.photoKey),
+                                      ),
+                                      if (r.videoThumbnailKey != null)
+                                        Positioned(
+                                          right: 6,
+                                          bottom: 6,
+                                          child: Container(
+                                            width: 22,
+                                            height: 22,
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.play_arrow,
+                                              color: Colors.white,
+                                              size: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      Positioned(
+                                        left: 6,
+                                        top: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.55,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.photo_camera_outlined,
+                                                size: 10,
+                                                color: Colors.white,
+                                              ),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                '${r.gallery.length}',
+                                                style: AppText.body(
+                                                  size: 9.5,
+                                                  weight: FontWeight.w700,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        right: 6,
+                                        top: 6,
+                                        child: IconButton(
+                                          onPressed: () => app
+                                              .toggleFavoriteRestaurant(r.id),
+                                          visualDensity: VisualDensity.compact,
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.black
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                          icon: Icon(
+                                            app.isFavoriteRestaurant(r.id)
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color:
+                                                app.isFavoriteRestaurant(r.id)
+                                                ? Colors.redAccent
+                                                : Colors.white,
+                                            size: 17,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              r.name,
+                                              style: AppText.body(
+                                                size: 16,
+                                                weight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          RatingPill(rating: r.rating),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        r.cuisines,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppText.body(
+                                          size: 12.5,
+                                          weight: FontWeight.w500,
+                                          color: AppColors.bodyGrey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${r.dist} · ${r.price}',
+                                        style: AppText.body(
+                                          size: 12.5,
+                                          weight: FontWeight.w500,
+                                          color: AppColors.bodyGrey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      DashedRect(
+                                        borderColor:
+                                            AppColors.dashedBookingBorder,
+                                        fillColor: AppColors.dashedBookingBg,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        radius: 9,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons
+                                                  .confirmation_number_outlined,
+                                              size: 13,
+                                              color: AppColors.accent,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '25% OFF on total bill',
+                                              style: AppText.body(
+                                                size: 11,
+                                                weight: FontWeight.w700,
+                                                color: AppColors.accent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  app.openBooking(r.id, maxGuests: r.maxGuests),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: AppColors.accent,
+                                  width: 1.5,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 11,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Book a table',
+                                style: AppText.body(
+                                  size: 13.5,
+                                  weight: FontWeight.w700,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => app.openBooking(r.id),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.accent, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text('Book a table', style: AppText.body(size: 13.5, weight: FontWeight.w700, color: AppColors.accent)),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DineInMessage extends StatelessWidget {
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onTap;
+
+  const _DineInMessage({required this.message, this.actionLabel, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 42),
+      child: Center(
+        child: Column(
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppText.body(size: 13, color: AppColors.bodyGrey),
+            ),
+            if (actionLabel != null && onTap != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: onTap, child: Text(actionLabel!)),
+            ],
           ],
         ),
       ),

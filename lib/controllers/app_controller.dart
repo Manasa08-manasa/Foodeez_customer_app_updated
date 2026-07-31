@@ -37,6 +37,7 @@ class AppController extends ChangeNotifier {
   int bDateIdx = 0;
   int bTimeIdx = 2;
   int bGuests = 2;
+  int bookingMaxGuests = 20;
   String bookingRid = 'paradise';
 
   final List<Booking> bookings = List.of(seedBookings);
@@ -276,15 +277,26 @@ class AppController extends ChangeNotifier {
   }
 
   void selectAddress(Map<String, dynamic> address) {
-    final lat = _parseLatLng(address['latitude'] ?? address['lat'], ApiConfig.lat);
-    final lng = _parseLatLng(address['longitude'] ?? address['lng'], ApiConfig.lng);
+    final lat = _parseLatLng(
+      address['latitude'] ?? address['lat'],
+      ApiConfig.lat,
+    );
+    final lng = _parseLatLng(
+      address['longitude'] ?? address['lng'],
+      ApiConfig.lng,
+    );
     final line1 = (address['addressLine1'] ?? '').toString();
     final city = (address['city'] ?? '').toString();
     final label = line1.isNotEmpty
         ? (city.isNotEmpty ? '$line1, $city' : line1)
         : (address['label']?.toString() ?? 'Saved location');
 
-    ApiConfig.setLocation(latitude: lat, longitude: lng, label: label, manual: true);
+    ApiConfig.setLocation(
+      latitude: lat,
+      longitude: lng,
+      label: label,
+      manual: true,
+    );
     store.shortAddress = ApiConfig.locationLabel;
     notifyListeners();
   }
@@ -313,7 +325,8 @@ class AppController extends ChangeNotifier {
   Future<List<Restaurant>> searchRestaurants(String q) =>
       AppRepository.searchRestaurants(q);
 
-  bool isFavoriteRestaurant(String id) => store.favoriteRestaurantIds.contains(id);
+  bool isFavoriteRestaurant(String id) =>
+      store.favoriteRestaurantIds.contains(id);
   bool isFavoriteItem(String id) => store.favoriteMenuItemIds.contains(id);
 
   Future<void> toggleFavoriteRestaurant(String restaurantId) async {
@@ -394,9 +407,12 @@ class AppController extends ChangeNotifier {
     final lower = text.toLowerCase();
     var type = 'OTHER';
     if (lower.contains('cancel')) type = 'REFUND_REQUEST';
-    if (lower.contains('payment') || lower.contains('billing')) type = 'PAYMENT_ISSUE';
-    if (lower.contains('where') || lower.contains('track')) type = 'DELIVERY_ISSUE';
-    if (lower.contains('wrong') || lower.contains('missing')) type = 'WRONG_ORDER';
+    if (lower.contains('payment') || lower.contains('billing'))
+      type = 'PAYMENT_ISSUE';
+    if (lower.contains('where') || lower.contains('track'))
+      type = 'DELIVERY_ISSUE';
+    if (lower.contains('wrong') || lower.contains('missing'))
+      type = 'WRONG_ORDER';
     await AppRepository.createSupportTicket(
       orderId: activeOrderId,
       type: type,
@@ -437,11 +453,15 @@ class AppController extends ChangeNotifier {
       supportChatError = null;
       supportChatReady = false;
       notifyListeners();
-      final sessionId = await _supportChatService.startSession(orderId: activeOrderId);
+      final sessionId = await _supportChatService.startSession(
+        orderId: activeOrderId,
+      );
       activeSupportSessionId = sessionId;
       supportChatReady = true;
       if (topic != null) {
-        chatMessages.add(ChatMessage(text: topic, fromCustomer: true, time: _timeNow()));
+        chatMessages.add(
+          ChatMessage(text: topic, fromCustomer: true, time: _timeNow()),
+        );
         await _supportChatService.sendMessage(sessionId, topic);
       }
       notifyListeners();
@@ -457,7 +477,9 @@ class AppController extends ChangeNotifier {
       await startSupportChat(topic: text);
       return;
     }
-    chatMessages.add(ChatMessage(text: text.trim(), fromCustomer: true, time: _timeNow()));
+    chatMessages.add(
+      ChatMessage(text: text.trim(), fromCustomer: true, time: _timeNow()),
+    );
     notifyListeners();
     await _supportChatService.sendMessage(activeSupportSessionId!, text.trim());
   }
@@ -579,6 +601,7 @@ class AppController extends ChangeNotifier {
       refreshHome();
     }
   }
+
   void toSearch() => setTab('search');
   void toDining() => setTab('dining');
   void toList() => push('list');
@@ -593,6 +616,7 @@ class AppController extends ChangeNotifier {
     paymentContext = 'booking';
     push('payment');
   }
+
   void toCart() => push('cart');
   void toCoupons() => push('coupons');
   void toHelp() {
@@ -604,11 +628,14 @@ class AppController extends ChangeNotifier {
   Future<void> openChat({String? topic}) async {
     trackMenuOpen = false;
     chatMessages.clear();
-    chatMessages.add(ChatMessage(
-      text: "Hi ${store.userName.split(' ').first}! I can help you with your order, delivery, refunds, or account questions.",
-      fromCustomer: false,
-      time: _timeNow(),
-    ));
+    chatMessages.add(
+      ChatMessage(
+        text:
+            "Hi ${store.userName.split(' ').first}! I can help you with your order, delivery, refunds, or account questions.",
+        fromCustomer: false,
+        time: _timeNow(),
+      ),
+    );
     if (topic != null) {
       await createSupportFromChat(topic);
       await startSupportChat(topic: topic);
@@ -640,11 +667,16 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void openBooking(String id) {
+  void openBooking(String id, {int? maxGuests}) {
     bookingRid = id;
     bDateIdx = 0;
     bTimeIdx = 2;
-    bGuests = 2;
+    bookingMaxGuests = (maxGuests ?? restaurantById(id).maxGuests).clamp(
+      1,
+      100,
+    );
+    bGuests = 2.clamp(1, bookingMaxGuests);
+    if (bGuests > bookingMaxGuests) bGuests = bookingMaxGuests;
     push('booking');
   }
 
@@ -732,7 +764,8 @@ class AppController extends ChangeNotifier {
         );
         final data = RemoteMappers.unwrap(res);
         if (data is Map) {
-          final itemId = (data['id'] ?? data['_id'] ?? data['cartItemId'])?.toString();
+          final itemId = (data['id'] ?? data['_id'] ?? data['cartItemId'])
+              ?.toString();
           if (itemId != null && itemId.isNotEmpty) {
             _remoteCartItemIds[id] = itemId;
           }
@@ -752,7 +785,9 @@ class AppController extends ChangeNotifier {
       if (TokenStore.isLoggedIn && remoteId != null) {
         try {
           await CustomerCartApi.removeItem(remoteId);
-        } catch (_) {/* fail-soft */}
+        } catch (_) {
+          /* fail-soft */
+        }
       }
     } else {
       cart[id] = qty;
@@ -761,7 +796,9 @@ class AppController extends ChangeNotifier {
       if (TokenStore.isLoggedIn && remoteId != null) {
         try {
           await CustomerCartApi.updateItem(remoteId, qty);
-        } catch (_) {/* fail-soft */}
+        } catch (_) {
+          /* fail-soft */
+        }
       }
     }
   }
@@ -797,14 +834,14 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
-  int get discount => itemsTotal > 0 ? (appliedCoupon?.discountFor(itemsTotal) ?? 0) : 0;
+  int get discount =>
+      itemsTotal > 0 ? (appliedCoupon?.discountFor(itemsTotal) ?? 0) : 0;
 
   int get deliveryFee => deliveryType == 'bolt' ? 0 : 20;
 
   int get taxes => itemsTotal > 0 ? (itemsTotal * 0.05).round() : 0;
 
-  int get grandTotal =>
-      max(0, itemsTotal - discount + deliveryFee + taxes);
+  int get grandTotal => max(0, itemsTotal - discount + deliveryFee + taxes);
 
   Future<void> applyCoupon(String code) async {
     appliedCouponCode = code;
@@ -823,7 +860,9 @@ class AppController extends ChangeNotifier {
     if (!TokenStore.isLoggedIn) return;
     try {
       await CustomerCartApi.removeCoupon();
-    } catch (_) {/* fail-soft */}
+    } catch (_) {
+      /* fail-soft */
+    }
   }
 
   void setBolt() {
@@ -915,13 +954,13 @@ class AppController extends ChangeNotifier {
       throw Exception('Could not start payment. Please try again.');
     }
 
-    final keyId =
-        (payment['keyId'] ?? payment['key_id'] ?? '').toString();
-    final razorpayOrderId = (payment['razorpayOrderId'] ??
-            payment['razorpay_order_id'] ??
-            payment['order_id'] ??
-            '')
-        .toString();
+    final keyId = (payment['keyId'] ?? payment['key_id'] ?? '').toString();
+    final razorpayOrderId =
+        (payment['razorpayOrderId'] ??
+                payment['razorpay_order_id'] ??
+                payment['order_id'] ??
+                '')
+            .toString();
     final currency = (payment['currency'] ?? 'INR').toString();
     final description = payment['description']?.toString();
     final amountRaw = payment['amount'];
@@ -957,8 +996,8 @@ class AppController extends ChangeNotifier {
   Future<void> _onOrderPlacedSuccess(dynamic res) async {
     final data = RemoteMappers.unwrap(res);
     if (data is Map) {
-      activeOrderId =
-          (data['orderId'] ?? data['id'] ?? data['_id'])?.toString();
+      activeOrderId = (data['orderId'] ?? data['id'] ?? data['_id'])
+          ?.toString();
     }
     cart.clear();
     _remoteCartItemIds.clear();
@@ -979,7 +1018,9 @@ class AppController extends ChangeNotifier {
     if (!TokenStore.isLoggedIn) return;
     try {
       await CustomerCartApi.clear();
-    } catch (_) {/* fail-soft */}
+    } catch (_) {
+      /* fail-soft */
+    }
   }
 
   void toggleVegOnly() {
@@ -1007,7 +1048,9 @@ class AppController extends ChangeNotifier {
   }
 
   List<Restaurant> get visibleRestaurants {
-    var list = vegOnly ? restaurants.where((r) => r.veg).toList() : List.of(restaurants);
+    var list = vegOnly
+        ? restaurants.where((r) => r.veg).toList()
+        : List.of(restaurants);
     if (minRating4) list = list.where((r) => r.rating >= 4.0).toList();
     if (fastDeliveryOnly) list = list.where((r) => _isFast(r.time)).toList();
     if (sortByRating) list.sort((a, b) => b.rating.compareTo(a.rating));
@@ -1035,7 +1078,7 @@ class AppController extends ChangeNotifier {
   // ---- booking guest stepper ----
 
   void incG() {
-    if (bGuests < 20) bGuests++;
+    if (bGuests < bookingMaxGuests) bGuests++;
     notifyListeners();
   }
 

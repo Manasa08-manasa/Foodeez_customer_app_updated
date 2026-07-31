@@ -114,6 +114,7 @@ class AppRepository {
           galleryPhotoKeys: current.galleryPhotoKeys,
           videoThumbnailKey: current.videoThumbnailKey,
           videoDuration: current.videoDuration,
+          maxGuests: current.maxGuests,
         );
       } catch (e) {
         debugPrint('[AppRepository] image backfill failed for $id: $e');

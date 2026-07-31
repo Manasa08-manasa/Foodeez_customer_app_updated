@@ -11,10 +11,12 @@ class RestaurantProfileScreen extends ConsumerStatefulWidget {
   const RestaurantProfileScreen({super.key});
 
   @override
-  ConsumerState<RestaurantProfileScreen> createState() => _RestaurantProfileScreenState();
+  ConsumerState<RestaurantProfileScreen> createState() =>
+      _RestaurantProfileScreenState();
 }
 
-class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScreen> {
+class _RestaurantProfileScreenState
+    extends ConsumerState<RestaurantProfileScreen> {
   final _pageController = PageController();
   int _page = 0;
 
@@ -54,7 +56,11 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x66000000), Colors.transparent, Color(0x33000000)],
+                      colors: [
+                        Color(0x66000000),
+                        Colors.transparent,
+                        Color(0x33000000),
+                      ],
                       stops: [0.0, 0.28, 1.0],
                     ),
                   ),
@@ -64,16 +70,28 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          CircleIconButton(icon: Icons.arrow_back_ios_new, onTap: app.back),
+                          CircleIconButton(
+                            icon: Icons.arrow_back_ios_new,
+                            onTap: app.back,
+                          ),
                           Row(
                             children: [
-                              const CircleIconButton(icon: Icons.favorite_border, iconColor: AppColors.accent),
+                              const CircleIconButton(
+                                icon: Icons.favorite_border,
+                                iconColor: AppColors.accent,
+                              ),
                               const SizedBox(width: 10),
-                              const CircleIconButton(icon: Icons.share, iconColor: AppColors.accent),
+                              const CircleIconButton(
+                                icon: Icons.share,
+                                iconColor: AppColors.accent,
+                              ),
                             ],
                           ),
                         ],
@@ -85,14 +103,31 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
                   right: 16,
                   bottom: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.photo_camera_outlined, size: 13, color: Colors.white),
+                        const Icon(
+                          Icons.photo_camera_outlined,
+                          size: 13,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 5),
-                        Text('${_page + 1}/${gallery.length}', style: AppText.body(size: 11.5, weight: FontWeight.w700, color: Colors.white)),
+                        Text(
+                          '${_page + 1}/${gallery.length}',
+                          style: AppText.body(
+                            size: 11.5,
+                            weight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -112,7 +147,9 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
                           width: active ? 16 : 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: active ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                            color: active
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(3),
                           ),
                         );
@@ -130,31 +167,64 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
               children: [
                 Row(
                   children: [
-                    Expanded(child: Text(rest.name, style: AppText.display(size: 22, letterSpacing: -0.3))),
+                    Expanded(
+                      child: Text(
+                        rest.name,
+                        style: AppText.display(size: 22, letterSpacing: -0.3),
+                      ),
+                    ),
                     RatingPill(rating: rest.rating),
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(rest.cuisines, style: AppText.body(size: 13, weight: FontWeight.w500, color: AppColors.bodyGrey)),
+                Text(
+                  rest.cuisines,
+                  style: AppText.body(
+                    size: 13,
+                    weight: FontWeight.w500,
+                    color: AppColors.bodyGrey,
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text('${rest.dist} · ${rest.price}', style: AppText.body(size: 12.5, weight: FontWeight.w500, color: AppColors.bodyGrey)),
+                Text(
+                  '${rest.dist} · ${rest.price}',
+                  style: AppText.body(
+                    size: 12.5,
+                    weight: FontWeight.w500,
+                    color: AppColors.bodyGrey,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 DashedRect(
                   borderColor: AppColors.dashedBookingBorder,
                   fillColor: AppColors.dashedBookingBg,
                   child: Row(
                     children: [
-                      const Icon(Icons.confirmation_number_outlined, size: 16, color: AppColors.accent),
+                      const Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 16,
+                        color: AppColors.accent,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('Flat 25% off on your total bill when you dine out',
-                            style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.accent)),
+                        child: Text(
+                          'Flat 25% off on your total bill when you dine out',
+                          style: AppText.body(
+                            size: 13,
+                            weight: FontWeight.w700,
+                            color: AppColors.accent,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
-                PrimaryButton(label: 'Book a table', onTap: () => app.openBooking(rest.id)),
+                PrimaryButton(
+                  label: 'Book a table',
+                  onTap: () =>
+                      app.openBooking(rest.id, maxGuests: rest.maxGuests),
+                ),
               ],
             ),
           ),
@@ -168,7 +238,8 @@ class _RestaurantProfileScreenState extends ConsumerState<RestaurantProfileScree
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
-        pageBuilder: (context, animation, secondaryAnimation) => _VideoViewer(media: media),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            _VideoViewer(media: media),
       ),
     );
   }
@@ -193,8 +264,15 @@ class _MediaTile extends StatelessWidget {
               child: Container(
                 width: 60,
                 height: 60,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.92), shape: BoxShape.circle),
-                child: const Icon(Icons.play_arrow, color: AppColors.accent, size: 32),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  color: AppColors.accent,
+                  size: 32,
+                ),
               ),
             ),
             Positioned(
@@ -202,8 +280,18 @@ class _MediaTile extends StatelessWidget {
               bottom: 40,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(6)),
-                child: Text(media.duration ?? '', style: AppText.body(size: 11, weight: FontWeight.w700, color: Colors.white)),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  media.duration ?? '',
+                  style: AppText.body(
+                    size: 11,
+                    weight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ],
@@ -221,15 +309,20 @@ class _VideoViewer extends StatefulWidget {
   State<_VideoViewer> createState() => _VideoViewerState();
 }
 
-class _VideoViewerState extends State<_VideoViewer> with SingleTickerProviderStateMixin {
+class _VideoViewerState extends State<_VideoViewer>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _progress;
   bool _playing = true;
 
   @override
   void initState() {
     super.initState();
-    final seconds = int.tryParse((widget.media.duration ?? '0:15').split(':').last) ?? 15;
-    _progress = AnimationController(vsync: this, duration: Duration(seconds: seconds))..forward();
+    final seconds =
+        int.tryParse((widget.media.duration ?? '0:15').split(':').last) ?? 15;
+    _progress = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: seconds),
+    )..forward();
     _progress.addListener(() {
       if (_progress.isCompleted) setState(() => _playing = false);
     });
@@ -272,8 +365,15 @@ class _VideoViewerState extends State<_VideoViewer> with SingleTickerProviderSta
                   child: Container(
                     width: 70,
                     height: 70,
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.92), shape: BoxShape.circle),
-                    child: const Icon(Icons.play_arrow, color: AppColors.accent, size: 38),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      color: AppColors.accent,
+                      size: 38,
+                    ),
                   ),
                 ),
               ),
@@ -281,7 +381,12 @@ class _VideoViewerState extends State<_VideoViewer> with SingleTickerProviderSta
             Positioned(
               top: 12,
               right: 12,
-              child: CircleIconButton(icon: Icons.close, bg: Colors.black.withValues(alpha: 0.5), iconColor: Colors.white, onTap: () => Navigator.of(context).pop()),
+              child: CircleIconButton(
+                icon: Icons.close,
+                bg: Colors.black.withValues(alpha: 0.5),
+                iconColor: Colors.white,
+                onTap: () => Navigator.of(context).pop(),
+              ),
             ),
             Positioned(
               left: 16,
