@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../controllers/app_controller.dart';
 import '../../data/app_repository.dart';
 import '../../data/mock_data.dart';
 import '../../controllers/providers.dart';
@@ -8,6 +9,37 @@ import '../widgets/brand_logo.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
+
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    AppController app,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Delete account?'),
+        content: const Text(
+          'Do you want to delete your account? This will sign you out and take you to the login screen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete account'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await app.deleteAccount();
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -253,6 +285,14 @@ class AccountScreen extends ConsumerWidget {
                               AppRepository.syncSessions();
                             },
                             showDivider: true,
+                          ),
+                          _ProfileActionTile(
+                            icon: Icons.delete_outline,
+                            label: 'Delete account',
+                            subtitle: 'Remove your account from this device',
+                            danger: true,
+                            showDivider: true,
+                            onTap: () => _confirmDeleteAccount(context, app),
                           ),
                           _ProfileActionTile(
                             icon: Icons.logout,

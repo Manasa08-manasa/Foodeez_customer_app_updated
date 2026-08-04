@@ -725,6 +725,25 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    try {
+      if (TokenStore.isLoggedIn) {
+        await CustomerAuthApi.logout();
+      }
+    } catch (_) {
+      await TokenStore.clear();
+    }
+    _remoteCartItemIds.clear();
+    cart.clear();
+    resetAuth();
+    userName = 'Guest';
+    userInitials = 'G';
+    userEmail = '';
+    userPhone = '';
+    stack = ['onboarding'];
+    notifyListeners();
+  }
+
   /// Guest skip — live nearby + Guest profile (no dummy Rahul name).
   void continueAsGuest() {
     resetAuth();
