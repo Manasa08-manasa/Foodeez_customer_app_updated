@@ -8,7 +8,7 @@ class CustomerDiscoveryApi {
   static Future<dynamic> nearby({
     required double lat,
     required double lng,
-    double? radius,
+    int? radius,
     int? page,
     int? limit,
     String? cuisine,

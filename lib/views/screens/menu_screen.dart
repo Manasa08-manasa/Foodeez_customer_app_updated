@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../controllers/providers.dart';
 import '../../core/responsive.dart';
@@ -104,15 +103,15 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   Widget build(BuildContext context) {
     final app = ref.watch(appControllerProvider);
     final rest = app.restaurant;
-    final sections = menuSectionOrder
-        .map((s) => MapEntry(s, menu.where((m) => m.section == s).toList()))
-        .where((e) => e.value.isNotEmpty)
-        .toList();
+    final sections = app.filteredMenuSections;
     for (final sec in sections) {
       _sectionKeys.putIfAbsent(sec.key, () => GlobalKey());
     }
 
     final closed = !rest.isOpen;
+    final description = rest.description.isNotEmpty
+        ? rest.description
+        : (rest.address.isNotEmpty ? rest.address : '');
 
     return Stack(
       children: [
@@ -165,9 +164,13 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                 ),
                                 Row(
                                   children: [
-                                    const CircleIconButton(
-                                      icon: Icons.favorite_border,
+                                    CircleIconButton(
+                                      icon: app.isFavoriteRestaurant(rest.id)
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
                                       iconColor: AppColors.accent,
+                                      onTap: () =>
+                                          app.toggleFavoriteRestaurant(rest.id),
                                     ),
                                     const SizedBox(width: 10),
                                     const CircleIconButton(
@@ -217,6 +220,18 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                             color: AppColors.bodyGrey,
                           ),
                         ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            description,
+                            style: AppText.body(
+                              size: 12.5,
+                              weight: FontWeight.w500,
+                              color: AppColors.bodyGrey,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -230,18 +245,49 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                 top: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text('${rest.rating}', style: AppText.body(size: 15, weight: FontWeight.w800, color: AppColors.green)),
+                                    Text(
+                                      rest.rating > 0
+                                          ? rest.rating.toStringAsFixed(1)
+                                          : '—',
+                                      style: AppText.body(
+                                        size: 15,
+                                        weight: FontWeight.w800,
+                                        color: AppColors.green,
+                                      ),
+                                    ),
                                     const SizedBox(width: 4),
-                                    const Icon(Icons.star_outline, color: AppColors.green, size: 14),
+                                    const Icon(
+                                      Icons.star_outline,
+                                      color: AppColors.green,
+                                      size: 14,
+                                    ),
                                   ],
                                 ),
                                 topColor: AppColors.green,
-                                bottom: '12k ratings',
+                                bottom: 'Rating',
                               ),
                               const _StatDivider(),
-                              _Stat(top: Text(rest.time, style: AppText.body(size: 15, weight: FontWeight.w800)), bottom: 'Delivery'),
+                              _Stat(
+                                top: Text(
+                                  rest.time,
+                                  style: AppText.body(
+                                    size: 15,
+                                    weight: FontWeight.w800,
+                                  ),
+                                ),
+                                bottom: 'Delivery',
+                              ),
                               const _StatDivider(),
-                              _Stat(top: Text(rest.price, style: AppText.body(size: 15, weight: FontWeight.w800)), bottom: 'For two'),
+                              _Stat(
+                                top: Text(
+                                  rest.price,
+                                  style: AppText.body(
+                                    size: 15,
+                                    weight: FontWeight.w800,
+                                  ),
+                                ),
+                                bottom: 'For two',
+                              ),
                             ],
                           ),
                         ),
@@ -277,7 +323,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                               ],
                             ),
                           )
-                        else
+                        else if (rest.offer.isNotEmpty)
                           DashedRect(
                             borderColor: AppColors.dashedOfferBorder,
                             fillColor: AppColors.dashedOfferBg,
@@ -295,7 +341,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    '${rest.offer} · code WELCOME50',
+                                    rest.offer,
                                     style: AppText.body(
                                       size: 13,
                                       weight: FontWeight.w700,
@@ -310,40 +356,152 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     ),
                   ),
                 ),
-                Transform.translate(
-                  offset: const Offset(0, -18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: sections.map((sec) {
-                      return Column(
-                        key: _sectionKeys[sec.key],
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-                            child: Text(
-                              sec.key,
-                              style: AppText.display(size: 16),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: sec.value
-                                  .map(
-                                    (it) => _MenuItemRow(
-                                      item: it,
-                                      disabled: closed || it.isOutOfStock,
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
+
+                // All / Veg / Non Veg — website parity
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    children: [
+                      FzFilterChip(
+                        label: 'All',
+                        filled: app.menuVegFilter == 'all',
+                        onTap: () => app.setMenuVegFilter('all'),
+                      ),
+                      const SizedBox(width: 8),
+                      FzFilterChip(
+                        label: 'Veg',
+                        filled: app.menuVegFilter == 'veg',
+                        leading: const VegDot(veg: true),
+                        onTap: () => app.setMenuVegFilter('veg'),
+                      ),
+                      const SizedBox(width: 8),
+                      FzFilterChip(
+                        label: 'Non Veg',
+                        filled: app.menuVegFilter == 'nonveg',
+                        leading: const VegDot(veg: false),
+                        onTap: () => app.setMenuVegFilter('nonveg'),
+                      ),
+                    ],
                   ),
                 ),
+
+                // Category chips from API sections
+                if (sections.isNotEmpty)
+                  SizedBox(
+                    height: 44,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: sections.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final name = sections[i].key;
+                        return FzFilterChip(
+                          label: name,
+                          filled: false,
+                          onTap: () {
+                            final key = _sectionKeys[name];
+                            final ctx = key?.currentContext;
+                            if (ctx != null) {
+                              Scrollable.ensureVisible(
+                                ctx,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeInOut,
+                                alignment: 0.05,
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                if (app.menuLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    ),
+                  )
+                else if (sections.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 40,
+                    ),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.restaurant_menu_outlined,
+                            size: 40,
+                            color: Color(0xFFD9CEC6),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            app.menuVegFilter == 'all'
+                                ? 'No menu items found'
+                                : 'No items match this filter',
+                            style: AppText.body(
+                              size: 13.5,
+                              weight: FontWeight.w600,
+                              color: AppColors.bodyGrey,
+                            ),
+                          ),
+                          if (app.menuVegFilter != 'all') ...[
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () => app.setMenuVegFilter('all'),
+                              child: Text(
+                                'Show all',
+                                style: AppText.body(
+                                  size: 13,
+                                  weight: FontWeight.w700,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Transform.translate(
+                    offset: const Offset(0, -8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: sections.map((sec) {
+                        return Column(
+                          key: _sectionKeys[sec.key],
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                              child: Text(
+                                sec.key,
+                                style: AppText.display(size: 16),
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                children: sec.value
+                                    .map(
+                                      (it) => _MenuItemRow(
+                                        item: it,
+                                        disabled: closed || it.isOutOfStock,
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -418,48 +576,50 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               ),
             ),
           ),
-        Positioned(
-          right: 16,
-          bottom: app.hasCart ? 88 : 20,
-          child: GestureDetector(
-            onTap: () => _openMenuJumpSheet(sections),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.cardBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.menu_book_outlined,
-                    size: 16,
-                    color: AppColors.accent,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'MENU',
-                    style: AppText.body(
-                      size: 12.5,
-                      weight: FontWeight.w800,
-                      color: AppColors.accent,
-                      letterSpacing: 0.5,
+        if (sections.isNotEmpty)
+          Positioned(
+            right: 16,
+            bottom: app.hasCart ? 88 : 20,
+            child: GestureDetector(
+              onTap: () => _openMenuJumpSheet(sections),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.menu_book_outlined,
+                      size: 16,
+                      color: AppColors.accent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'MENU',
+                      style: AppText.body(
+                        size: 12.5,
+                        weight: FontWeight.w800,
+                        color: AppColors.accent,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

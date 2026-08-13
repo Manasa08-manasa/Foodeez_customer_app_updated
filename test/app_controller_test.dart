@@ -15,7 +15,7 @@ void main() {
     expect(app.hasCart, isFalse);
   });
 
-  testWidgets('home screen shows the real nearby restaurant count', (tester) async {
+  testWidgets('home screen shows nearby restaurant count from live list', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: FoodeezApp()));
     await tester.pump();
 

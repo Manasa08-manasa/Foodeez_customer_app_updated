@@ -10,9 +10,9 @@ class ApiConfig {
   static String get backendOrigin =>
       defaultBaseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
 
-  /// Fallback when GPS is unavailable — matches a known working nearby call.
-  static const double fallbackLat = 17.434933173394903;
-  static const double fallbackLng = 78.38825416305876;
+  /// INT nearby restaurants live around this Hyderabad pin.
+  static const double fallbackLat = 17.434897863129663;
+  static const double fallbackLng = 78.38829382541574;
 
   /// Live device (or last-known) coordinates used by discovery/search.
   static double lat = fallbackLat;

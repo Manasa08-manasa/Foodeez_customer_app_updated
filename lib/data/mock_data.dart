@@ -47,99 +47,28 @@ String foodImageUrl(String key, {int width = 520}) {
   return 'https://images.unsplash.com/photo-$id?w=$width&q=80&auto=format&fit=crop';
 }
 
-/// Mutable so [AppRepository] can swap in live discovery results (seed = offline fallback).
-final List<Restaurant> restaurants = [
-  Restaurant(
-    id: 'paradise',
-    name: 'Paradise Biryani',
-    cuisines: 'Biryani · Hyderabadi · Mughlai',
-    rating: 4.5,
+/// Live nearby results from [AppRepository.syncRestaurants] — starts empty (no mock seed).
+final List<Restaurant> restaurants = [];
+
+Restaurant restaurantById(String id) {
+  for (final r in restaurants) {
+    if (r.id == id) return r;
+  }
+  return Restaurant(
+    id: id,
+    name: 'Restaurant',
+    cuisines: 'Multi-cuisine',
+    description: '',
+    address: '',
+    rating: 4.0,
     time: '30-35 min',
     price: '₹300 for two',
-    dist: '1.2 km',
-    offer: '50% OFF up to ₹100',
+    dist: '—',
+    offer: '',
     veg: false,
     photoKey: 'biryani',
-    galleryPhotoKeys: ['paneer', 'thali', 'haleem'],
-    videoThumbnailKey: 'biryani',
-    videoDuration: '0:18',
-  ),
-  Restaurant(
-    id: 'truffles',
-    name: 'Truffles',
-    cuisines: 'Burgers · American · Steaks',
-    rating: 4.3,
-    time: '25-30 min',
-    price: '₹500 for two',
-    dist: '2.0 km',
-    offer: 'Free delivery',
-    veg: false,
-    photoKey: 'burger',
-    galleryPhotoKeys: ['pizza', 'noodles'],
-    videoThumbnailKey: 'burger',
-    videoDuration: '0:12',
-  ),
-  Restaurant(
-    id: 'naturals',
-    name: 'Naturals Ice Cream',
-    cuisines: 'Desserts · Ice Cream · Shakes',
-    rating: 4.6,
-    time: '18-22 min',
-    price: '₹200 for two',
-    dist: '0.8 km',
-    offer: 'Buy 1 Get 1',
-    veg: true,
-    photoKey: 'icecream',
-    galleryPhotoKeys: ['cake', 'coffee'],
-  ),
-  Restaurant(
-    id: 'saravana',
-    name: 'Saravana Bhavan',
-    cuisines: 'South Indian · Dosa · Idli',
-    rating: 4.4,
-    time: '20-25 min',
-    price: '₹250 for two',
-    dist: '1.5 km',
-    offer: '20% OFF',
-    veg: true,
-    photoKey: 'dosa',
-    galleryPhotoKeys: ['idli', 'coffee'],
-    videoThumbnailKey: 'dosa',
-    videoDuration: '0:10',
-  ),
-  Restaurant(
-    id: 'wowmomo',
-    name: 'WOW! Momo',
-    cuisines: 'Momos · Tibetan · Chinese',
-    rating: 4.1,
-    time: '28-32 min',
-    price: '₹350 for two',
-    dist: '2.4 km',
-    offer: 'Free delivery',
-    veg: false,
-    photoKey: 'momo',
-    isOpen: false,
-    galleryPhotoKeys: ['noodles', 'thali'],
-  ),
-  Restaurant(
-    id: 'barbeque',
-    name: 'Barbeque Nation',
-    cuisines: 'North Indian · BBQ · Buffet',
-    rating: 4.5,
-    time: '38-42 min',
-    price: '₹1600 for two',
-    dist: '3.1 km',
-    offer: 'Flat ₹150 OFF',
-    veg: false,
-    photoKey: 'kebab',
-    galleryPhotoKeys: ['thali', 'paneer', 'curry'],
-    videoThumbnailKey: 'kebab',
-    videoDuration: '0:20',
-  ),
-];
-
-Restaurant restaurantById(String id) =>
-    restaurants.firstWhere((r) => r.id == id, orElse: () => restaurants.first);
+  );
+}
 
 const List<Category> categories = [
   Category('Biryani', 'biryani'),
@@ -154,109 +83,28 @@ const List<Category> categories = [
   Category('Momos', 'momo'),
 ];
 
-final List<MenuItem> menu = [
-  MenuItem(
-    id: 'chicken-biryani',
-    section: 'Recommended',
-    name: 'Chicken Dum Biryani',
-    desc: 'Aromatic basmati slow-cooked with tender chicken, saffron & fried onions',
-    price: 320,
-    veg: false,
-    rating: 4.6,
-    ratingsCount: '2.1k',
-    bestseller: true,
+/// Live menu from [AppRepository.syncMenu] — starts empty (no mock seed).
+final List<MenuItem> menu = [];
+
+final List<String> menuSectionOrder = [];
+
+MenuItem menuItemById(String id) {
+  for (final m in menu) {
+    if (m.id == id) return m;
+  }
+  return MenuItem(
+    id: id,
+    section: '',
+    name: 'Item',
+    desc: '',
+    price: 0,
+    veg: true,
+    rating: 0,
+    ratingsCount: '',
+    bestseller: false,
     photoKey: 'biryani',
-  ),
-  MenuItem(
-    id: 'paneer',
-    section: 'Recommended',
-    name: 'Paneer Butter Masala',
-    desc: 'Cottage cheese in a rich tomato-cashew gravy, mildly spiced',
-    price: 280,
-    veg: true,
-    rating: 4.4,
-    ratingsCount: '1.3k',
-    bestseller: true,
-    photoKey: 'paneer',
-  ),
-  MenuItem(
-    id: 'haleem',
-    section: 'Recommended',
-    name: 'Hyderabadi Haleem',
-    desc: 'Slow-cooked lentils, wheat & mutton, finished with ghee',
-    price: 340,
-    veg: false,
-    rating: 4.7,
-    ratingsCount: '820',
-    bestseller: false,
-    photoKey: 'haleem',
-  ),
-  MenuItem(
-    id: 'naan',
-    section: 'Breads',
-    name: 'Butter Naan',
-    desc: 'Soft tandoori flatbread brushed with butter',
-    price: 60,
-    veg: true,
-    rating: 4.5,
-    ratingsCount: '910',
-    bestseller: false,
-    photoKey: 'curry',
-  ),
-  MenuItem(
-    id: 'samosa',
-    section: 'Breads',
-    name: 'Punjabi Samosa (2 pcs)',
-    desc: 'Crisp pastry stuffed with spiced potato & peas',
-    price: 70,
-    veg: true,
-    rating: 4.3,
-    ratingsCount: '520',
-    bestseller: false,
-    photoKey: 'samosa',
-  ),
-  MenuItem(
-    id: 'gulab',
-    section: 'Desserts',
-    name: 'Gulab Jamun (2 pcs)',
-    desc: 'Warm milk dumplings soaked in rose-cardamom syrup',
-    price: 90,
-    veg: true,
-    rating: 4.6,
-    ratingsCount: '1.1k',
-    bestseller: true,
-    photoKey: 'gulab',
-  ),
-  MenuItem(
-    id: 'lassi',
-    section: 'Beverages',
-    name: 'Sweet Lassi',
-    desc: 'Thick, chilled yoghurt drink — house special',
-    price: 80,
-    veg: true,
-    rating: 4.4,
-    ratingsCount: '300',
-    bestseller: false,
-    photoKey: 'coffee',
-  ),
-  MenuItem(
-    id: 'coke',
-    section: 'Beverages',
-    name: 'Coke (500 ml)',
-    desc: 'Chilled soft drink',
-    price: 60,
-    veg: true,
-    rating: 4.2,
-    ratingsCount: '120',
-    bestseller: false,
-    photoKey: 'coke',
-  ),
-];
-
-final List<String> menuSectionOrder = ['Recommended', 'Breads', 'Desserts', 'Beverages'];
-
-MenuItem menuItemById(String id) =>
-    menu.firstWhere((m) => m.id == id, orElse: () => menu.first);
+  );
+}
 
 const List<PaymentMethod> paymentMethods = [
   PaymentMethod(
@@ -361,32 +209,8 @@ const List<String> paymentGroupOrder = [
 PaymentMethod paymentMethodById(String id) =>
     paymentMethods.firstWhere((p) => p.id == id);
 
-final List<PastOrder> pastOrders = [
-  PastOrder(
-    id: 'FZ2390',
-    restaurantId: 'truffles',
-    items: 'Classic Burger + Fries',
-    total: 540,
-    when: 'Yesterday · 1:20 PM',
-    rating: 4,
-  ),
-  PastOrder(
-    id: 'FZ2201',
-    restaurantId: 'saravana',
-    items: 'Masala Dosa x2, Filter Coffee',
-    total: 250,
-    when: '28 Jun · 9:05 AM',
-    rating: 5,
-  ),
-  PastOrder(
-    id: 'FZ2088',
-    restaurantId: 'wowmomo',
-    items: 'Steam Momo, Schezwan Momo',
-    total: 350,
-    when: '24 Jun · 8:40 PM',
-    rating: 4,
-  ),
-];
+/// Live order history from [AppRepository.syncOrders] — starts empty (no mock seed).
+final List<PastOrder> pastOrders = [];
 
 final List<Booking> seedBookings = [
   const Booking(

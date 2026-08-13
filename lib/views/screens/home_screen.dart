@@ -14,8 +14,10 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final app = ref.watch(appControllerProvider);
-    final openRestaurants = restaurants.where((r) => r.isOpen).toList();
-    final banners = openRestaurants.take(4).toList();
+    final loadingRestaurants =
+        (app.isHydrating || app.restaurantsSyncing) && restaurants.isEmpty;
+    final listed = List<Restaurant>.from(restaurants);
+    final banners = listed.take(4).toList();
     final visible = app.visibleRestaurants;
     final pad = AppResponsive.of(context).pagePadding;
 
@@ -118,16 +120,27 @@ class HomeScreen extends ConsumerWidget {
             ),
 
             // banners
-            SizedBox(
-              height: 168,
-              child: ListView.separated(
+            if (loadingRestaurants)
+              Padding(
                 padding: EdgeInsets.fromLTRB(pad, 18, pad, 8),
-                scrollDirection: Axis.horizontal,
-                itemCount: banners.length,
-                separatorBuilder: (context, _) => const SizedBox(width: 14),
-                itemBuilder: (context, i) => _BannerCard(restaurant: banners[i]),
+                child: const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
+                ),
+              )
+            else if (banners.isNotEmpty)
+              SizedBox(
+                height: 168,
+                child: ListView.separated(
+                  padding: EdgeInsets.fromLTRB(pad, 18, pad, 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: banners.length,
+                  separatorBuilder: (context, _) => const SizedBox(width: 14),
+                  itemBuilder: (context, i) => _BannerCard(restaurant: banners[i]),
+                ),
               ),
-            ),
 
             const SectionTitle('Sponsored', padding: EdgeInsets.fromLTRB(20, 4, 20, 4)),
             SizedBox(
@@ -166,20 +179,29 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            SizedBox(
-              height: 250,
-              child: ListView.separated(
-                padding: EdgeInsets.fromLTRB(pad, 12, pad, 20),
-                scrollDirection: Axis.horizontal,
-                itemCount: openRestaurants.length,
-                separatorBuilder: (context, _) => const SizedBox(width: 14),
-                itemBuilder: (context, i) => _TopPickCard(restaurant: openRestaurants[i], onTap: () => app.openRest(openRestaurants[i].id)),
+            if (!loadingRestaurants && listed.isNotEmpty)
+              SizedBox(
+                height: 250,
+                child: ListView.separated(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 20),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: listed.length,
+                  separatorBuilder: (context, _) => const SizedBox(width: 14),
+                  itemBuilder: (context, i) => _TopPickCard(
+                    restaurant: listed[i],
+                    onTap: () => app.openRest(listed[i].id),
+                  ),
+                ),
               ),
-            ),
 
             Padding(
               padding: EdgeInsets.fromLTRB(pad, 8, pad, 2),
-              child: Text('${visible.length} restaurants around you', style: AppText.display(size: 18)),
+              child: Text(
+                loadingRestaurants
+                    ? 'Finding restaurants near you…'
+                    : '${visible.length} restaurants around you',
+                style: AppText.display(size: 18),
+              ),
             ),
             SizedBox(
               height: 60,
@@ -216,15 +238,30 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
 
-            if (visible.isEmpty)
+            if (loadingRestaurants)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: pad, vertical: 30),
+                child: Center(
+                  child: Text(
+                    'Loading nearby restaurants…',
+                    style: AppText.body(size: 13.5, weight: FontWeight.w600, color: AppColors.bodyGrey),
+                  ),
+                ),
+              )
+            else if (visible.isEmpty)
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: pad, vertical: 30),
                 child: Center(
                   child: Column(
                     children: [
-                      const Icon(Icons.search_off, size: 40, color: Color(0xFFD9CEC6)),
+                      const Icon(Icons.storefront_outlined, size: 40, color: Color(0xFFD9CEC6)),
                       const SizedBox(height: 10),
-                      Text('No restaurants match these filters', style: AppText.body(size: 13.5, weight: FontWeight.w600, color: AppColors.bodyGrey)),
+                      Text(
+                        restaurants.isEmpty
+                            ? 'No restaurants found nearby'
+                            : 'No restaurants match these filters',
+                        style: AppText.body(size: 13.5, weight: FontWeight.w600, color: AppColors.bodyGrey),
+                      ),
                     ],
                   ),
                 ),

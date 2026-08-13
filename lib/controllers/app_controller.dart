@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import '../core/utils/order_status_utils.dart';
 import '../data/app_repository.dart';
 import '../data/mock_data.dart';
 import '../data/mock_data.dart' as store;
@@ -46,6 +48,24 @@ class AppController extends ChangeNotifier {
   bool trackMenuOpen = false;
   String? activeOrderId;
 
+  /// Live tracking snapshot for [activeOrderId] (website order detail).
+  PastOrder? trackingOrder;
+  String trackingStatus = 'PLACED';
+  int? trackingEtaMins;
+  double? riderLat;
+  double? riderLng;
+  double? riderSpeed;
+  String? riderName;
+  String? riderPhone;
+  String? delayMessage;
+  String? deliveryAddressLine;
+  bool trackingLoading = false;
+
+  Timer? _ordersPollTimer;
+  Timer? _trackingPollTimer;
+  StreamSubscription<OrderTrackingEvent>? _trackingSocketSub;
+  final OrderTrackingService _orderTrackingService = OrderTrackingService();
+
   final List<ChatMessage> chatMessages = [];
   bool agentTyping = false;
   String? activeSupportSessionId;
@@ -54,6 +74,12 @@ class AppController extends ChangeNotifier {
   String? supportChatError;
 
   bool isHydrating = true;
+  bool restaurantsSyncing = false;
+  bool menuLoading = false;
+
+  /// Menu screen veg filter — independent of home Pure Veg restaurant filter.
+  /// `'all' | 'veg' | 'nonveg'`
+  String menuVegFilter = 'all';
   bool get isLoggedIn => TokenStore.isLoggedIn;
 
   /// Flag to determine if SelectLocationScreen should update home location (true) or save address (false)
@@ -185,6 +211,7 @@ class AppController extends ChangeNotifier {
       debugPrint('[AppController] hydrate failed: $e');
     } finally {
       isHydrating = false;
+      _syncActiveOrderFromHistory();
       notifyListeners();
     }
   }
@@ -217,10 +244,13 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refreshHome() async {
+    restaurantsSyncing = true;
+    notifyListeners();
     try {
       await LocationService.ensureLocation();
+      store.shortAddress = ApiConfig.locationLabel;
+      await AppRepository.syncRestaurants();
       await Future.wait([
-        AppRepository.syncRestaurants(),
         AppRepository.syncTrending(),
         AppRepository.syncPopularDishes(),
         AppRepository.syncCoupons(),
@@ -228,15 +258,23 @@ class AppController extends ChangeNotifier {
     } catch (e) {
       debugPrint('[AppController] refreshHome failed: $e');
     } finally {
+      restaurantsSyncing = false;
       if (hasListeners) notifyListeners();
     }
   }
 
   Future<void> refreshLocationAndNearby() async {
-    await LocationService.ensureLocation(force: true);
-    store.shortAddress = ApiConfig.locationLabel;
-    await AppRepository.syncRestaurants();
+    restaurantsSyncing = true;
     notifyListeners();
+    try {
+      await LocationService.ensureLocation(force: true);
+      store.shortAddress = ApiConfig.locationLabel;
+      await AppRepository.syncRestaurants();
+      await AppRepository.syncTrending();
+    } finally {
+      restaurantsSyncing = false;
+      notifyListeners();
+    }
   }
 
   /// Apply a manually chosen delivery/home location and refresh nearby
@@ -255,18 +293,30 @@ class AppController extends ChangeNotifier {
     store.shortAddress = ApiConfig.locationLabel;
     selectLocationForHome = false;
     notifyListeners();
+    restaurantsSyncing = true;
+    notifyListeners();
     try {
-      await AppRepository.syncRestaurants();
+      await AppRepository.syncRestaurants(allowEmpty: true);
+      await AppRepository.syncTrending();
     } catch (e) {
       debugPrint('[AppController] applyHomeLocation sync failed: $e');
+    } finally {
+      restaurantsSyncing = false;
+      if (hasListeners) notifyListeners();
     }
-    if (hasListeners) notifyListeners();
   }
 
   /// Refresh nearby list using the already-selected ApiConfig coordinates.
   Future<void> refreshNearbyOnly() async {
-    await AppRepository.syncRestaurants();
+    restaurantsSyncing = true;
     notifyListeners();
+    try {
+      await AppRepository.syncRestaurants();
+      await AppRepository.syncTrending();
+    } finally {
+      restaurantsSyncing = false;
+      notifyListeners();
+    }
   }
 
   double _parseLatLng(dynamic value, [double fallback = 0.0]) {
@@ -303,8 +353,206 @@ class AppController extends ChangeNotifier {
 
   Future<void> refreshOrders() async {
     await AppRepository.syncOrders();
+    _syncActiveOrderFromHistory();
     notifyListeners();
   }
+
+  List<PastOrder> get activeOrders => store.pastOrders
+      .where((o) => OrderStatusUtils.isActive(o.status))
+      .toList();
+
+  List<PastOrder> get completedOrders => store.pastOrders
+      .where((o) => OrderStatusUtils.isPast(o.status))
+      .toList();
+
+  void _syncActiveOrderFromHistory() {
+    if (activeOrderId != null) {
+      for (final o in store.pastOrders) {
+        if (o.orderId == activeOrderId) {
+          trackingOrder = o;
+          trackingStatus = o.status;
+          if (!OrderStatusUtils.isActive(o.status)) {
+            stopLiveTracking(clearActive: true);
+          }
+          return;
+        }
+      }
+    }
+    // Restore latest live order after relaunch.
+    if (activeOrderId == null && activeOrders.isNotEmpty) {
+      activeOrderId = activeOrders.first.orderId;
+      trackingOrder = activeOrders.first;
+      trackingStatus = activeOrders.first.status;
+    }
+  }
+
+  Future<void> openTracking(String orderId) async {
+    activeOrderId = orderId;
+    trackMenuOpen = false;
+    push('tracking');
+    await startLiveTracking(orderId);
+  }
+
+  Future<void> startLiveTracking(String orderId) async {
+    if (orderId.isEmpty || !TokenStore.isLoggedIn) return;
+    activeOrderId = orderId;
+    trackingLoading = true;
+    notifyListeners();
+
+    await _refreshTrackingSnapshot(orderId);
+    trackingLoading = false;
+    notifyListeners();
+
+    _trackingPollTimer?.cancel();
+    _trackingPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _refreshTrackingSnapshot(orderId);
+    });
+
+    _ordersPollTimer?.cancel();
+    _ordersPollTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      await AppRepository.syncOrders();
+      _syncActiveOrderFromHistory();
+      if (hasListeners) notifyListeners();
+    });
+
+    await _trackingSocketSub?.cancel();
+    _trackingSocketSub = _orderTrackingService.events.listen(_onTrackingSocketEvent);
+    try {
+      await _orderTrackingService.connectAndJoin(orderId);
+    } catch (e) {
+      debugPrint('[AppController] tracking socket failed: $e');
+    }
+  }
+
+  void stopLiveTracking({bool clearActive = false}) {
+    _trackingPollTimer?.cancel();
+    _trackingPollTimer = null;
+    _ordersPollTimer?.cancel();
+    _ordersPollTimer = null;
+    _trackingSocketSub?.cancel();
+    _trackingSocketSub = null;
+    _orderTrackingService.leave();
+    if (clearActive) {
+      activeOrderId = null;
+    }
+  }
+
+  void _onTrackingSocketEvent(OrderTrackingEvent event) {
+    if (activeOrderId == null) return;
+    if (event.orderId != null &&
+        event.orderId!.isNotEmpty &&
+        event.orderId != activeOrderId) {
+      return;
+    }
+    switch (event.type) {
+      case OrderTrackingEventType.status:
+        if (event.status != null && event.status!.isNotEmpty) {
+          trackingStatus = OrderStatusUtils.normalize(event.status);
+          if (trackingOrder != null) {
+            trackingOrder = PastOrder(
+              orderId: trackingOrder!.orderId,
+              orderNumber: trackingOrder!.orderNumber,
+              restaurantId: trackingOrder!.restaurantId,
+              restaurantName: trackingOrder!.restaurantName,
+              items: trackingOrder!.items,
+              itemCount: trackingOrder!.itemCount,
+              total: trackingOrder!.total,
+              status: trackingStatus,
+              createdAt: trackingOrder!.createdAt,
+              when: trackingOrder!.when,
+              rating: trackingOrder!.rating,
+            );
+          }
+        }
+        break;
+      case OrderTrackingEventType.riderLocation:
+        riderLat = event.latitude ?? riderLat;
+        riderLng = event.longitude ?? riderLng;
+        riderSpeed = event.speed ?? riderSpeed;
+        break;
+      case OrderTrackingEventType.eta:
+        trackingEtaMins = event.etaMins ?? trackingEtaMins;
+        break;
+      case OrderTrackingEventType.delay:
+        delayMessage = event.delayMessage ?? delayMessage;
+        break;
+    }
+    if (hasListeners) notifyListeners();
+  }
+
+  Future<void> _refreshTrackingSnapshot(String orderId) async {
+    try {
+      final detail = await AppRepository.getOrder(orderId);
+      if (detail != null) {
+        final mapped = RemoteMappers.pastOrder(detail);
+        trackingOrder = mapped;
+        trackingStatus = mapped.status;
+        final partner = detail['deliveryPartner'];
+        if (partner is Map) {
+          riderName = (partner['name'] ?? riderName)?.toString();
+          riderPhone = (partner['phone'] ?? riderPhone)?.toString();
+        }
+        final addr =
+            detail['deliveryAddressSnapshot'] ?? detail['deliveryAddress'];
+        if (addr is Map) {
+          final line1 = (addr['addressLine1'] ?? '').toString();
+          final city = (addr['city'] ?? '').toString();
+          deliveryAddressLine = [
+            line1,
+            city,
+          ].where((s) => s.isNotEmpty).join(', ');
+        }
+      }
+
+      final track = await AppRepository.tracking(orderId);
+      if (track != null) {
+        final status =
+            (track['status'] ?? track['orderStatus'])?.toString();
+        if (status != null && status.isNotEmpty) {
+          trackingStatus = OrderStatusUtils.normalize(status);
+        }
+        final eta = track['etaMins'] ?? track['eta'];
+        if (eta is num) trackingEtaMins = eta.round();
+        if (eta is String) trackingEtaMins = int.tryParse(eta) ?? trackingEtaMins;
+        riderLat = _parseDouble(track['riderLatitude'] ?? track['latitude']) ??
+            riderLat;
+        riderLng =
+            _parseDouble(track['riderLongitude'] ?? track['longitude']) ??
+                riderLng;
+        riderSpeed =
+            _parseDouble(track['riderSpeed'] ?? track['speed']) ?? riderSpeed;
+        delayMessage =
+            (track['delayMessage'] ?? delayMessage)?.toString();
+        if ((track['deliveryPartnerId'] ?? '').toString().isNotEmpty &&
+            (riderName == null || riderName!.isEmpty)) {
+          riderName = 'Delivery partner';
+        }
+      }
+
+      if (!OrderStatusUtils.isActive(trackingStatus) &&
+          trackingStatus == 'DELIVERED') {
+        await AppRepository.syncOrders();
+      }
+    } catch (e) {
+      debugPrint('[AppController] tracking refresh failed: $e');
+    }
+    if (hasListeners) notifyListeners();
+  }
+
+  double? _parseDouble(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v');
+  }
+
+  bool get trackingHasPartner =>
+      (riderName != null && riderName!.isNotEmpty) ||
+      (riderLat != null && riderLng != null);
+
+  int? get trackingDisplayEta => OrderStatusUtils.remainingEtaMins(
+        status: trackingStatus,
+        createdAt: trackingOrder?.createdAt,
+        liveEtaMins: trackingEtaMins,
+      );
 
   Future<void> refreshAccount() async {
     await Future.wait([
@@ -377,7 +625,7 @@ class AppController extends ChangeNotifier {
     }
     PastOrder? order;
     for (final o in store.pastOrders) {
-      if (o.id == orderId) {
+      if (o.orderId == orderId || o.orderNumber == orderId) {
         order = o;
         break;
       }
@@ -397,7 +645,7 @@ class AppController extends ChangeNotifier {
   Future<void> cancelActiveOrder({String reason = 'Changed my mind'}) async {
     if (activeOrderId == null) return;
     await AppRepository.cancelOrder(activeOrderId!, reason);
-    activeOrderId = null;
+    stopLiveTracking(clearActive: true);
     await AppRepository.syncOrders();
     notifyListeners();
   }
@@ -585,6 +833,13 @@ class AppController extends ChangeNotifier {
   void toOrders() {
     setTab('orders');
     refreshOrders();
+    _ordersPollTimer?.cancel();
+    _ordersPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (screen != 'orders' && screen != 'tracking') return;
+      await AppRepository.syncOrders();
+      _syncActiveOrderFromHistory();
+      if (hasListeners) notifyListeners();
+    });
   }
 
   void toAccount() {
@@ -654,17 +909,64 @@ class AppController extends ChangeNotifier {
 
   Future<void> openRest(String id) async {
     rid = id;
+    menuVegFilter = 'all';
     if (appliedCouponCode != null &&
         !couponsForCurrentRestaurant.any((c) => c.code == appliedCouponCode)) {
       appliedCouponCode = null;
     }
+    // Clear previous restaurant menu so UI never shows dummy/stale items.
+    store.menu.clear();
+    store.menuSectionOrder.clear();
+    menuLoading = true;
     push('menu');
-    await Future.wait([
-      AppRepository.syncRestaurantDetails(id),
-      AppRepository.syncMenu(id),
-      AppRepository.syncRestaurantCoupons(id),
-    ]);
     notifyListeners();
+    try {
+      await Future.wait([
+        AppRepository.syncRestaurantDetails(id),
+        AppRepository.syncMenu(id),
+        AppRepository.syncRestaurantCoupons(id),
+      ]);
+    } finally {
+      menuLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void setMenuVegFilter(String filter) {
+    if (filter != 'all' && filter != 'veg' && filter != 'nonveg') return;
+    menuVegFilter = filter;
+    notifyListeners();
+  }
+
+  List<MenuItem> get filteredMenuItems {
+    switch (menuVegFilter) {
+      case 'veg':
+        return store.menu.where((m) => m.veg).toList();
+      case 'nonveg':
+        return store.menu.where((m) => !m.veg).toList();
+      default:
+        return List.of(store.menu);
+    }
+  }
+
+  List<MapEntry<String, List<MenuItem>>> get filteredMenuSections {
+    final items = filteredMenuItems;
+    final sections = <MapEntry<String, List<MenuItem>>>[];
+    for (final s in store.menuSectionOrder) {
+      final list = items.where((m) => m.section == s).toList();
+      if (list.isNotEmpty) sections.add(MapEntry(s, list));
+    }
+    // Any sections not in order (shouldn't happen) still show.
+    final known = store.menuSectionOrder.toSet();
+    for (final m in items) {
+      if (!known.contains(m.section)) {
+        known.add(m.section);
+        sections.add(
+          MapEntry(m.section, items.where((e) => e.section == m.section).toList()),
+        );
+      }
+    }
+    return sections;
   }
 
   void openBooking(String id, {int? maxGuests}) {
@@ -835,8 +1137,9 @@ class AppController extends ChangeNotifier {
   bool get cartEmpty => !hasCart;
 
   int get orderBadgeCount {
-    final pastCount = store.pastOrders.length;
-    return activeOrderId != null ? pastCount + 1 : pastCount;
+    final live = activeOrders.length;
+    if (live > 0) return live;
+    return store.pastOrders.length;
   }
 
   int get itemsTotal =>
@@ -1014,20 +1317,30 @@ class AppController extends ChangeNotifier {
 
   Future<void> _onOrderPlacedSuccess(dynamic res) async {
     final data = RemoteMappers.unwrap(res);
+    String? placedId;
     if (data is Map) {
-      activeOrderId = (data['orderId'] ?? data['id'] ?? data['_id'])
-          ?.toString();
+      placedId = (data['orderId'] ?? data['id'] ?? data['_id'])?.toString();
     }
     cart.clear();
     _remoteCartItemIds.clear();
     appliedCouponCode = null;
     await AppRepository.syncOrders();
-    push('tracking');
+    _syncActiveOrderFromHistory();
+    if (placedId == null || placedId.isEmpty) {
+      placedId = activeOrders.isNotEmpty ? activeOrders.first.orderId : null;
+    }
+    activeOrderId = placedId;
+    if (placedId != null && placedId.isNotEmpty) {
+      push('tracking');
+      await startLiveTracking(placedId);
+    } else {
+      toOrders();
+    }
   }
 
   Future<void> fetchTracking() async {
     if (activeOrderId == null || !TokenStore.isLoggedIn) return;
-    await AppRepository.tracking(activeOrderId!);
+    await startLiveTracking(activeOrderId!);
   }
 
   Future<void> clearRemoteCart() async {

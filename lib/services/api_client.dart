@@ -42,7 +42,12 @@ class ApiClient {
     final p = path.startsWith('/') ? path : '/$path';
     final qp = <String, String>{};
     query?.forEach((k, v) {
-      if (v != null) qp[k] = v.toString();
+      if (v == null) return;
+      if (v is num && v == v.round()) {
+        qp[k] = v.round().toString();
+      } else {
+        qp[k] = v.toString();
+      }
     });
     return Uri.parse('$base$p').replace(queryParameters: qp.isEmpty ? null : qp);
   }

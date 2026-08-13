@@ -15,9 +15,8 @@ class AppRepository {
   static Future<bool> hydrate() async {
     await TokenStore.init();
 
-    // GPS first so nearby/search use the same coords as the website.
-    await LocationService.ensureLocation();
-    store.shortAddress = ApiConfig.locationLabel;
+    // Resolve GPS in parallel — first nearby call uses fallback Hyderabad coords.
+    final locationFuture = LocationService.ensureLocation();
 
     // Refresh token quietly when we have one.
     if (TokenStore.refreshToken != null) {
@@ -26,9 +25,17 @@ class AppRepository {
       } catch (_) {/* keep existing access token */}
     }
 
+    // Nearby first at current/fallback coords so Home has API restaurants
+    // even if GPS later resolves far from INT Hyderabad test data.
+    var live = await syncRestaurants();
+
+    await locationFuture;
+    store.shortAddress = ApiConfig.locationLabel;
+    live = await syncRestaurants() || live;
+    live = await syncTrending() || live;
+
     final results = await Future.wait<bool>([
-      syncRestaurants(),
-      syncTrending(),
+      Future.value(live),
       syncPopularDishes(),
       syncCoupons(),
       if (TokenStore.isLoggedIn) syncProfile(),
@@ -39,6 +46,7 @@ class AppRepository {
       if (TokenStore.isLoggedIn) syncFavorites(),
       if (TokenStore.isLoggedIn) syncSupportTickets(),
     ]);
+
     if (TokenStore.isLoggedIn) {
       await syncCart();
     }
@@ -47,38 +55,70 @@ class AppRepository {
 
   // ── Discovery ──────────────────────────────────────────────────────────────
 
-  static Future<bool> syncRestaurants() async {
+  static bool _isFallbackCoords(double lat, double lng) =>
+      (lat - ApiConfig.fallbackLat).abs() < 0.0005 &&
+      (lng - ApiConfig.fallbackLng).abs() < 0.0005;
+
+  static Future<List<Restaurant>> _nearbyAt(double lat, double lng) async {
     // Exact website call shape:
     // GET /customer/discovery/nearby?lat=&lng=&radius=50000&limit=200
-    const radii = <double>[50000, 100000, 500000];
+    const radii = <int>[50000, 100000, 500000];
     for (final radius in radii) {
       try {
         final res = await CustomerDiscoveryApi.nearby(
-          lat: ApiConfig.lat,
-          lng: ApiConfig.lng,
+          lat: lat,
+          lng: lng,
           radius: radius,
           limit: 200,
         );
         final list = RemoteMappers.discoveryRestaurants(res);
         debugPrint(
-          '[AppRepository] nearby lat=${ApiConfig.lat} lng=${ApiConfig.lng} '
-          'radius=$radius → ${list.length} restaurants',
+          '[AppRepository] nearby lat=$lat lng=$lng radius=$radius '
+          '→ ${list.length} restaurants'
+          '${list.isEmpty ? '' : ': ${list.map((r) => r.name).join(', ')}'}',
         );
-        if (list.isNotEmpty) {
-          store.restaurants
-            ..clear()
-            ..addAll(list);
-          backendLive = true;
-          // Fire-and-forget cover backfill (website does the same from menu).
-          // ignore: unawaited_futures
-          _backfillRestaurantImages(list.take(8).map((r) => r.id).toList());
-          return true;
-        }
+        if (list.isNotEmpty) return list;
       } catch (e) {
         debugPrint('[AppRepository] nearby(radius=$radius) failed: $e');
       }
     }
-    return false;
+    return const [];
+  }
+
+  static Future<bool> syncRestaurants({bool allowEmpty = false}) async {
+    var list = await _nearbyAt(ApiConfig.lat, ApiConfig.lng);
+
+    // INT restaurants are pinned near Hyderabad. Device GPS elsewhere
+    // returns [] and used to wipe the Home list — retry the known pin.
+    if (list.isEmpty && !_isFallbackCoords(ApiConfig.lat, ApiConfig.lng)) {
+      debugPrint(
+        '[AppRepository] no restaurants at GPS '
+        '(${ApiConfig.lat}, ${ApiConfig.lng}) — retrying fallback pin',
+      );
+      list = await _nearbyAt(ApiConfig.fallbackLat, ApiConfig.fallbackLng);
+    }
+
+    if (list.isEmpty) {
+      if (!allowEmpty && store.restaurants.isNotEmpty) {
+        debugPrint(
+          '[AppRepository] nearby empty — keeping '
+          '${store.restaurants.length} already-loaded restaurants',
+        );
+        return true;
+      }
+      store.restaurants.clear();
+      backendLive = true;
+      return true;
+    }
+
+    store.restaurants
+      ..clear()
+      ..addAll(list);
+    backendLive = true;
+    // Fire-and-forget cover backfill (website does the same from menu).
+    // ignore: unawaited_futures
+    _backfillRestaurantImages(list.take(8).map((r) => r.id).toList());
+    return true;
   }
 
   static Future<void> _backfillRestaurantImages(List<String> branchIds) async {
@@ -99,23 +139,7 @@ class AppRepository {
           }
         }
         if (url == null) continue;
-        store.restaurants[idx] = Restaurant(
-          id: current.id,
-          name: current.name,
-          cuisines: current.cuisines,
-          rating: current.rating,
-          time: current.time,
-          price: current.price,
-          dist: current.dist,
-          offer: current.offer,
-          veg: current.veg,
-          photoKey: url,
-          isOpen: current.isOpen,
-          galleryPhotoKeys: current.galleryPhotoKeys,
-          videoThumbnailKey: current.videoThumbnailKey,
-          videoDuration: current.videoDuration,
-          maxGuests: current.maxGuests,
-        );
+        store.restaurants[idx] = current.copyWith(photoKey: url);
       } catch (e) {
         debugPrint('[AppRepository] image backfill failed for $id: $e');
       }
@@ -187,10 +211,31 @@ class AppRepository {
       final res = await CustomerDiscoveryApi.restaurantDetails(branchId);
       final data = RemoteMappers.unwrap(res);
       if (data is Map) {
-        final r = RemoteMappers.restaurant(Map<String, dynamic>.from(data));
+        final raw = Map<String, dynamic>.from(data);
+        // Details nests brand fields under `restaurant` (same as nearby).
+        final nested = raw['restaurant'];
+        if (nested is Map) {
+          final n = Map<String, dynamic>.from(nested);
+          raw['brandDescription'] ??= n['brandDescription'];
+          raw['description'] ??= n['brandDescription'] ?? n['description'];
+          raw['cuisineTags'] ??= n['cuisineTags'];
+          raw['coverPhoto'] ??= n['coverPhoto'];
+          raw['logoUrl'] ??= n['logoUrl'];
+          raw['avgCostForTwo'] ??= n['avgCostForTwo'];
+          raw['name'] ??= n['name'];
+        }
+        final r = RemoteMappers.restaurant(raw);
         final idx = store.restaurants.indexWhere((e) => e.id == branchId);
         if (idx >= 0) {
-          store.restaurants[idx] = r;
+          final prev = store.restaurants[idx];
+          store.restaurants[idx] = r.copyWith(
+            // Keep a cover we already resolved if details has none.
+            photoKey: r.photoKey == 'biryani' ? prev.photoKey : r.photoKey,
+            description: r.description.isNotEmpty
+                ? r.description
+                : prev.description,
+            address: r.address.isNotEmpty ? r.address : prev.address,
+          );
         } else {
           store.restaurants.add(r);
         }
@@ -207,22 +252,26 @@ class AppRepository {
     try {
       final res = await CustomerDiscoveryApi.menu(branchId);
       final mapped = RemoteMappers.menu(res);
-      if (mapped.isNotEmpty) {
-        store.menu
-          ..clear()
-          ..addAll(mapped);
-        final sections = <String>[];
-        for (final m in mapped) {
-          if (!sections.contains(m.section)) sections.add(m.section);
-        }
-        store.menuSectionOrder
-          ..clear()
-          ..addAll(sections);
-        backendLive = true;
-        return true;
+      store.menu
+        ..clear()
+        ..addAll(mapped);
+      final sections = <String>[];
+      for (final m in mapped) {
+        if (!sections.contains(m.section)) sections.add(m.section);
       }
+      store.menuSectionOrder
+        ..clear()
+        ..addAll(sections);
+      backendLive = true;
+      debugPrint(
+        '[AppRepository] menu($branchId) → ${mapped.length} items, '
+        '${sections.length} categories',
+      );
+      return true;
     } catch (e) {
       debugPrint('[AppRepository] menu($branchId) failed: $e');
+      store.menu.clear();
+      store.menuSectionOrder.clear();
     }
     return false;
   }
@@ -336,14 +385,23 @@ class AppRepository {
   static Future<bool> syncOrders() async {
     try {
       final res = await CustomerOrdersApi.history(limit: 20);
-      final list = RemoteMappers.unwrapList(res, ['orders', 'results', 'items']);
-      final mapped = list.map(RemoteMappers.pastOrder).toList();
-      if (mapped.isNotEmpty) {
-        store.pastOrders
-          ..clear()
-          ..addAll(mapped);
+      // Backend: { data: [...orders], meta } — unwrapList digs the array.
+      var list = RemoteMappers.unwrapList(res, ['orders', 'results', 'items', 'data']);
+      if (list.isEmpty) {
+        final raw = RemoteMappers.unwrap(res);
+        if (raw is List) {
+          list = raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
       }
+      final mapped = list.map(RemoteMappers.pastOrder).toList();
+      store.pastOrders
+        ..clear()
+        ..addAll(mapped);
       backendLive = true;
+      debugPrint('[AppRepository] orders synced → ${mapped.length}');
       return true;
     } catch (e) {
       debugPrint('[AppRepository] order history failed: $e');

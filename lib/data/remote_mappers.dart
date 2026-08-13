@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import '../core/utils/order_status_utils.dart';
 import '../models/models.dart';
 import '../services/api_config.dart';
 import '../theme.dart';
@@ -71,6 +74,23 @@ class RemoteMappers {
       if (v is String) return v.toLowerCase() == 'true';
     }
     return fallback;
+  }
+
+  static double _haversineKm(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
+    const earthKm = 6371.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLng = (lng2 - lng1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    return 2 * earthKm * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
   static String? _firstPhotoUrl(dynamic photos) {
@@ -147,16 +167,25 @@ class RemoteMappers {
         normalized['cuisines'] ??= n['cuisines'] ?? n['cuisine'];
         normalized['storePhotos'] ??= n['storePhotos'];
         normalized['brandDescription'] ??= n['brandDescription'];
+        normalized['description'] ??= n['brandDescription'] ?? n['description'];
         normalized['restaurantId'] ??= n['id'];
+        normalized['coverPhoto'] ??= n['coverPhoto'];
+        normalized['logoUrl'] ??= n['logoUrl'];
+        normalized['avgCostForTwo'] ??= n['avgCostForTwo'];
+        normalized['averageCostMin'] ??= n['averageCostMin'];
+        normalized['offersAvailable'] ??= n['offersAvailable'];
+        normalized['maxGuestsPerReservation'] ??= n['maxGuestsPerReservation'];
       }
       normalized['imageUrl'] =
           j['imageUrl'] ??
           j['image_url'] ??
           j['coverPhotoUrl'] ??
+          normalized['coverPhoto'] ??
           j['coverPhoto'] ??
           j['thumbnail'] ??
           j['photo'] ??
           j['image'] ??
+          normalized['logoUrl'] ??
           _firstPhotoUrl(normalized['storePhotos']);
       final r = restaurant(normalized);
       if (seen.add(r.id)) out.add(r);
@@ -202,7 +231,14 @@ class RemoteMappers {
       'avgCostForTwo',
       'averageCostMin',
     ], 0);
-    final distKm = _num(j, ['distance', 'distanceKm', 'distanceInKm'], 0);
+    var distKm = _num(j, ['distance', 'distanceKm', 'distanceInKm'], 0);
+    if (distKm <= 0) {
+      final rLat = _num(j, ['latitude', 'lat'], 0);
+      final rLng = _num(j, ['longitude', 'lng', 'lon'], 0);
+      if (rLat != 0 && rLng != 0) {
+        distKm = _haversineKm(ApiConfig.lat, ApiConfig.lng, rLat, rLng);
+      }
+    }
     final deliveryFee = _num(j, ['deliveryFee', 'delivery_fee'], -1);
 
     final gallery = (j['gallery'] ?? j['images'] ?? j['galleryImages']);
@@ -214,6 +250,21 @@ class RemoteMappers {
       id: _str(j, ['id', '_id', 'branchId', 'restaurantId'], 'unknown'),
       name: _str(j, ['name', 'branchName', 'restaurantName'], 'Restaurant'),
       cuisines: cuisines,
+      description: _str(j, [
+        'brandDescription',
+        'description',
+        'about',
+        'bio',
+      ], ''),
+      address: () {
+        final line = _str(j, ['address', 'addressLine1', 'fullAddress'], '');
+        final city = _str(j, ['city'], '');
+        if (line.isEmpty) return city;
+        if (city.isEmpty || line.toLowerCase().contains(city.toLowerCase())) {
+          return line;
+        }
+        return '$line, $city';
+      }(),
       rating: _num(j, ['rating', 'avgRating', 'averageRating'], 4.0),
       time: time,
       price: priceForTwo > 0
@@ -259,9 +310,85 @@ class RemoteMappers {
 
   // ── MenuItem (discovery/restaurants/{id}/menu) ───────────────────────────
 
+  /// Infer veg when API omits `isVeg` (common on INT) — mirrors website.
+  static bool _inferIsVeg({
+    required Map m,
+    required String name,
+    required String section,
+  }) {
+    final raw = m['isVeg'] ??
+        m['is_veg'] ??
+        m['veg'] ??
+        m['vegetarian'] ??
+        m['foodType'] ??
+        m['type'];
+    if (raw is bool) return raw;
+    if (raw != null) {
+      final s = raw.toString().toLowerCase().trim();
+      if (s.contains('non') || s == 'n' || s == '0' || s == 'false') {
+        return false;
+      }
+      if (s.contains('veg') || s == 'y' || s == '1' || s == 'true') {
+        return true;
+      }
+    }
+
+    final hay = '$name $section'.toLowerCase();
+    const nonVeg = [
+      'non-veg',
+      'non veg',
+      'nonveg',
+      'chicken',
+      'mutton',
+      'goat',
+      'lamb',
+      'pork',
+      'beef',
+      'fish',
+      'prawn',
+      'shrimp',
+      'lobster',
+      'egg',
+      'meat',
+      'keema',
+      'kebab',
+      'haleem',
+      'butter chicken',
+    ];
+    for (final k in nonVeg) {
+      if (hay.contains(k)) return false;
+    }
+    const veg = [
+      'paneer',
+      'veg ',
+      ' vegetable',
+      'dal',
+      'dosa',
+      'idli',
+      'samosa',
+      'gulab',
+      'lassi',
+      'roti',
+      'naan',
+      'paratha',
+      'salad',
+      'mushroom',
+      'aloo',
+      'gobi',
+      'palak',
+    ];
+    for (final k in veg) {
+      if (hay.contains(k)) return true;
+    }
+    // Default non-veg when unknown so "Non Veg" filter still has content;
+    // pure-veg restaurants usually set isVeg on items.
+    return false;
+  }
+
   /// A menu response is either a flat list of items or a list of
   /// category/section groups each holding `items`. Handles both.
   static List<MenuItem> menu(dynamic res) {
+    // Live API: { branchId, categories: [...] } (no data envelope).
     final payload = unwrap(res);
     final out = <MenuItem>[];
 
@@ -270,19 +397,24 @@ class RemoteMappers {
       final isVisible = _bool(m, ['isVisible', 'visible'], true);
       if (!isVisible) return;
 
-      // Availability comes from isInStock. autoOutOfStock is only a merchant
-      // setting (often true even when the item is still orderable).
       final isInStock = _bool(m, ['isInStock', 'inStock', 'available'], true);
       final autoOutOfStock = _bool(m, ['autoOutOfStock'], false);
+      final name = _str(m, ['name', 'itemName'], 'Item');
+      final desc = _str(m, [
+        'description',
+        'desc',
+        'itemDescription',
+        'shortDescription',
+      ], '');
 
       out.add(
         MenuItem(
           id: _str(m, ['id', '_id', 'menuItemId'], 'item-${out.length}'),
           section: section,
-          name: _str(m, ['name', 'itemName'], 'Item'),
-          desc: _str(m, ['description', 'desc'], ''),
+          name: name,
+          desc: desc,
           price: _num(m, ['price', 'sellingPrice', 'amount'], 0).round(),
-          veg: _bool(m, ['isVeg', 'veg']),
+          veg: _inferIsVeg(m: m, name: name, section: section),
           rating: _num(m, ['rating', 'avgRating'], 4.2),
           ratingsCount: _str(m, [
             'ratingsCount',
@@ -298,7 +430,7 @@ class RemoteMappers {
                   'image',
                   'photo',
                   'thumbnail',
-                ], 'biryani'),
+                ], ''),
               ) ??
               'biryani',
           isInStock: isInStock,
@@ -311,10 +443,11 @@ class RemoteMappers {
     dynamic groups = payload;
     if (payload is Map) {
       groups =
-          payload['menu'] ??
           payload['categories'] ??
+          payload['menu'] ??
           payload['sections'] ??
-          payload['items'];
+          payload['items'] ??
+          payload['data'];
     }
     if (groups is! List) return out;
 
@@ -333,7 +466,6 @@ class RemoteMappers {
           addItem(it, section);
         }
       } else {
-        // flat item list
         addItem(
           g,
           _str(g, [
@@ -403,59 +535,65 @@ class RemoteMappers {
 
   static PastOrder pastOrder(Map<String, dynamic> j) {
     final itemsRaw = j['items'] ?? j['orderItems'];
+    var itemCount = _num(j, ['itemCount', 'itemsCount'], 0).round();
     String items;
     if (itemsRaw is List) {
+      var qtySum = 0;
       items = itemsRaw
           .whereType<Map>()
           .map((it) {
             final name = _str(it, ['name', 'itemName', 'menuItemName'], 'Item');
             final qty = _num(it, ['quantity', 'qty'], 1).round();
+            qtySum += qty;
             return qty > 1 ? '$name x$qty' : name;
           })
           .join(', ');
+      if (itemCount <= 0) itemCount = qtySum > 0 ? qtySum : itemsRaw.length;
     } else {
       items = itemsRaw?.toString() ?? '';
+      if (itemCount <= 0 && items.isNotEmpty) {
+        itemCount = items.split(',').where((s) => s.trim().isNotEmpty).length;
+      }
     }
 
-    String when = _str(j, ['createdAt', 'placedAt', 'orderDate'], '');
-    final dt = DateTime.tryParse(when);
-    if (dt != null) {
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-      when =
-          '${dt.day} ${months[dt.month - 1]} · $h:${dt.minute.toString().padLeft(2, '0')} $ampm';
-    }
+    final createdAt = _str(j, ['createdAt', 'placedAt', 'orderDate'], '');
+    final when = OrderStatusUtils.formatPastDateTime(createdAt);
 
     final rest = j['restaurant'] ?? j['branch'];
-    final restId = rest is Map
-        ? _str(Map<String, dynamic>.from(rest), ['id', '_id', 'branchId'], '')
-        : _str(j, ['restaurantId', 'branchId'], '');
+    String restId = '';
+    String restName = '';
+    if (rest is Map) {
+      final rm = Map<String, dynamic>.from(rest);
+      restId = _str(rm, ['id', '_id', 'branchId'], '');
+      restName = _str(rm, ['name', 'branchName'], '');
+    } else {
+      restId = _str(j, ['restaurantId', 'branchId'], '');
+    }
+    if (restName.isEmpty) {
+      restName = _str(j, ['restaurantName', 'restaurantLabel', 'branchName'], '');
+    }
+
+    final orderId = _str(j, ['id', '_id', 'orderId'], '');
+    final orderNumber = _str(j, ['orderNumber', 'order_number'], orderId);
 
     return PastOrder(
-      id: _str(j, ['orderNumber', 'id', '_id'], 'FZ0000'),
+      orderId: orderId.isNotEmpty ? orderId : orderNumber,
+      orderNumber: orderNumber.isNotEmpty ? orderNumber : orderId,
       restaurantId: restId,
+      restaurantName: restName,
       items: items,
+      itemCount: itemCount,
       total: _num(j, [
         'grandTotal',
         'total',
         'totalAmount',
         'amount',
       ], 0).round(),
-      when: when,
+      status: OrderStatusUtils.normalize(
+        _str(j, ['status', 'orderStatus'], 'PLACED'),
+      ),
+      createdAt: createdAt,
+      when: when.isNotEmpty ? when : createdAt,
       rating: _num(j, ['rating', 'customerRating'], 0).round(),
     );
   }
