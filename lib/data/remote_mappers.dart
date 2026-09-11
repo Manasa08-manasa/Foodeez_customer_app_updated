@@ -341,6 +341,25 @@ class RemoteMappers {
     }
 
     final hay = '$name $section'.toLowerCase();
+    final normalizedName = name.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]+'),
+      '',
+    );
+    final normalizedSection = section.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]+'),
+      '',
+    );
+    // Category labels are authoritative when the API does not send isVeg.
+    // Check the section before the item name so a bad/mixed item label cannot
+    // move an item from a clearly vegetarian or non-vegetarian category.
+    if (normalizedSection.contains('nonveg')) {
+      return false;
+    }
+    if (normalizedSection.contains('veg')) {
+      return true;
+    }
+    if (normalizedName.contains('nonveg')) return false;
+    if (normalizedName == 'veg' || normalizedName.contains('veg')) return true;
     const nonVeg = [
       'non-veg',
       'non veg',
@@ -365,6 +384,21 @@ class RemoteMappers {
     for (final k in nonVeg) {
       if (hay.contains(k)) return false;
     }
+    const vegSections = [
+      'veg',
+      'vegetarian',
+      'juice',
+      'drink',
+      'beverage',
+      'salad',
+      'dessert',
+      'sweet',
+      'fruit',
+    ];
+    final sectionHay = section.toLowerCase();
+    for (final k in vegSections) {
+      if (sectionHay.contains(k)) return true;
+    }
     const veg = [
       'paneer',
       'veg ',
@@ -387,9 +421,9 @@ class RemoteMappers {
     for (final k in veg) {
       if (hay.contains(k)) return true;
     }
-    // Default non-veg when unknown so "Non Veg" filter still has content;
-    // pure-veg restaurants usually set isVeg on items.
-    return false;
+    // Keep unknown items out of Non Veg. The API omits isVeg for many neutral
+    // categories, and Non Veg should contain only confidently non-veg items.
+    return true;
   }
 
   /// A menu response is either a flat list of items or a list of

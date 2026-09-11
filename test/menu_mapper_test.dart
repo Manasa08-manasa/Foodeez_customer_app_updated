@@ -70,6 +70,90 @@ void main() {
     ]);
   });
 
+  test('menu infers vegetarian items from live category names', () {
+    final items = RemoteMappers.menu({
+      'branchId': '9e5c4857-9293-4b23-9cd5-0c6db93788ba',
+      'categories': [
+        {
+          'name': 'non-veg-noodles',
+          'displayName': 'NON - VEG NOODLES',
+          'items': [
+            {'id': 'egg-noodles', 'name': 'Egg Noodles'},
+          ],
+        },
+        {
+          'name': 'fresh-juices',
+          'displayName': 'Fresh Juices',
+          'items': [
+            {'id': 'mosambi', 'name': 'Mosambi Juice'},
+          ],
+        },
+      ],
+    });
+
+    expect(items.first.veg, isFalse);
+    expect(items.last.veg, isTrue);
+  });
+
+  test('menu keeps spaced non-veg labels out of the veg filter', () {
+    final items = RemoteMappers.menu({
+      'categories': [
+        {
+          'displayName': 'NON - VEG STARTERS',
+          'items': [
+            {'id': 'chicken', 'name': 'Chicken Majestic'},
+          ],
+        },
+        {
+          'displayName': 'LUNCH BOX',
+          'items': [
+            {'id': 'non-veg-box', 'name': 'NON - VEG'},
+            {'id': 'veg-box', 'name': 'VEG'},
+          ],
+        },
+      ],
+    });
+
+    expect(items.where((item) => item.veg).map((item) => item.id), ['veg-box']);
+    expect(items.where((item) => !item.veg).map((item) => item.id), [
+      'chicken',
+      'non-veg-box',
+    ]);
+  });
+
+  test('category labels take priority over item names', () {
+    final items = RemoteMappers.menu({
+      'categories': [
+        {
+          'displayName': 'VEG CURRIES',
+          'items': [
+            {'id': 'veg-category', 'name': 'Chicken Styled Veg Curry'},
+          ],
+        },
+        {
+          'displayName': 'NON - VEG CURRIES',
+          'items': [
+            {'id': 'nonveg-category', 'name': 'Veg Curry With Chicken'},
+          ],
+        },
+        {
+          'displayName': 'PASTAS',
+          'items': [
+            {'id': 'plain-pasta', 'name': 'Alfredo Pasta'},
+          ],
+        },
+      ],
+    });
+
+    expect(items.where((item) => item.veg).map((item) => item.id), [
+      'veg-category',
+      'plain-pasta',
+    ]);
+    expect(items.where((item) => !item.veg).map((item) => item.id), [
+      'nonveg-category',
+    ]);
+  });
+
   test('restaurant maps brandDescription and address', () {
     final r = RemoteMappers.restaurant({
       'id': '89052db6-e17e-428b-9c1e-8bea861a9edd',
