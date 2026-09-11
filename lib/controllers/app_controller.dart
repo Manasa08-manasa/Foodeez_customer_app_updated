@@ -24,6 +24,7 @@ class AppController extends ChangeNotifier {
   Restaurant get restaurant => store.restaurantById(rid);
 
   final Map<String, int> cart = {};
+  final Map<String, MenuItem> _cartItemDetails = {};
 
   /// Backend cart-line id keyed by local menu item id (when logged in).
   final Map<String, String> _remoteCartItemIds = {};
@@ -188,13 +189,14 @@ class AppController extends ChangeNotifier {
       await AppRepository.hydrate();
       if (TokenStore.isLoggedIn) {
         final remoteIds = await AppRepository.syncCart();
-        if (store.lastSyncedCart.isNotEmpty) {
+        if (AppRepository.cartSyncSucceeded) {
           cart
             ..clear()
             ..addAll(store.lastSyncedCart);
           _remoteCartItemIds
             ..clear()
             ..addAll(remoteIds);
+          _cartItemDetails.clear();
           if (store.lastSyncedCouponCode != null) {
             appliedCouponCode = store.lastSyncedCouponCode;
           }
@@ -229,13 +231,14 @@ class AppController extends ChangeNotifier {
       AppRepository.syncSupportTickets(),
     ]);
     final remoteIds = await AppRepository.syncCart();
-    if (store.lastSyncedCart.isNotEmpty) {
+    if (AppRepository.cartSyncSucceeded) {
       cart
         ..clear()
         ..addAll(store.lastSyncedCart);
       _remoteCartItemIds
         ..clear()
         ..addAll(remoteIds);
+      _cartItemDetails.clear();
       if (store.lastSyncedCouponCode != null) {
         appliedCouponCode = store.lastSyncedCouponCode;
       }
@@ -361,9 +364,8 @@ class AppController extends ChangeNotifier {
       .where((o) => OrderStatusUtils.isActive(o.status))
       .toList();
 
-  List<PastOrder> get completedOrders => store.pastOrders
-      .where((o) => OrderStatusUtils.isPast(o.status))
-      .toList();
+  List<PastOrder> get completedOrders =>
+      store.pastOrders.where((o) => OrderStatusUtils.isPast(o.status)).toList();
 
   void _syncActiveOrderFromHistory() {
     if (activeOrderId != null) {
@@ -416,7 +418,9 @@ class AppController extends ChangeNotifier {
     });
 
     await _trackingSocketSub?.cancel();
-    _trackingSocketSub = _orderTrackingService.events.listen(_onTrackingSocketEvent);
+    _trackingSocketSub = _orderTrackingService.events.listen(
+      _onTrackingSocketEvent,
+    );
     try {
       await _orderTrackingService.connectAndJoin(orderId);
     } catch (e) {
@@ -506,23 +510,23 @@ class AppController extends ChangeNotifier {
 
       final track = await AppRepository.tracking(orderId);
       if (track != null) {
-        final status =
-            (track['status'] ?? track['orderStatus'])?.toString();
+        final status = (track['status'] ?? track['orderStatus'])?.toString();
         if (status != null && status.isNotEmpty) {
           trackingStatus = OrderStatusUtils.normalize(status);
         }
         final eta = track['etaMins'] ?? track['eta'];
         if (eta is num) trackingEtaMins = eta.round();
-        if (eta is String) trackingEtaMins = int.tryParse(eta) ?? trackingEtaMins;
-        riderLat = _parseDouble(track['riderLatitude'] ?? track['latitude']) ??
+        if (eta is String)
+          trackingEtaMins = int.tryParse(eta) ?? trackingEtaMins;
+        riderLat =
+            _parseDouble(track['riderLatitude'] ?? track['latitude']) ??
             riderLat;
         riderLng =
             _parseDouble(track['riderLongitude'] ?? track['longitude']) ??
-                riderLng;
+            riderLng;
         riderSpeed =
             _parseDouble(track['riderSpeed'] ?? track['speed']) ?? riderSpeed;
-        delayMessage =
-            (track['delayMessage'] ?? delayMessage)?.toString();
+        delayMessage = (track['delayMessage'] ?? delayMessage)?.toString();
         if ((track['deliveryPartnerId'] ?? '').toString().isNotEmpty &&
             (riderName == null || riderName!.isEmpty)) {
           riderName = 'Delivery partner';
@@ -549,10 +553,10 @@ class AppController extends ChangeNotifier {
       (riderLat != null && riderLng != null);
 
   int? get trackingDisplayEta => OrderStatusUtils.remainingEtaMins(
-        status: trackingStatus,
-        createdAt: trackingOrder?.createdAt,
-        liveEtaMins: trackingEtaMins,
-      );
+    status: trackingStatus,
+    createdAt: trackingOrder?.createdAt,
+    liveEtaMins: trackingEtaMins,
+  );
 
   Future<void> refreshAccount() async {
     await Future.wait([
@@ -610,13 +614,14 @@ class AppController extends ChangeNotifier {
       final ok = await AppRepository.reorder(orderId);
       if (ok) {
         final remoteIds = await AppRepository.syncCart();
-        if (store.lastSyncedCart.isNotEmpty) {
+        if (AppRepository.cartSyncSucceeded) {
           cart
             ..clear()
             ..addAll(store.lastSyncedCart);
           _remoteCartItemIds
             ..clear()
             ..addAll(remoteIds);
+          _cartItemDetails.clear();
         }
         notifyListeners();
         toCart();
@@ -773,6 +778,7 @@ class AppController extends ChangeNotifier {
   Future<void> logoutAllDevices() async {
     await AppRepository.logoutAll();
     _remoteCartItemIds.clear();
+    _cartItemDetails.clear();
     cart.clear();
     resetAuth();
     userName = 'Guest';
@@ -962,7 +968,10 @@ class AppController extends ChangeNotifier {
       if (!known.contains(m.section)) {
         known.add(m.section);
         sections.add(
-          MapEntry(m.section, items.where((e) => e.section == m.section).toList()),
+          MapEntry(
+            m.section,
+            items.where((e) => e.section == m.section).toList(),
+          ),
         );
       }
     }
@@ -1017,6 +1026,7 @@ class AppController extends ChangeNotifier {
       await TokenStore.clear();
     }
     _remoteCartItemIds.clear();
+    _cartItemDetails.clear();
     cart.clear();
     resetAuth();
     userName = 'Guest';
@@ -1036,6 +1046,7 @@ class AppController extends ChangeNotifier {
       await TokenStore.clear();
     }
     _remoteCartItemIds.clear();
+    _cartItemDetails.clear();
     cart.clear();
     resetAuth();
     userName = 'Guest';
@@ -1070,6 +1081,9 @@ class AppController extends ChangeNotifier {
       }
     } catch (_) {}
 
+    if (menu.any((item) => item.id == id)) {
+      _cartItemDetails[id] = menuItemById(id);
+    }
     cart[id] = (cart[id] ?? 0) + 1;
     notifyListeners();
     if (!TokenStore.isLoggedIn) return;
@@ -1101,6 +1115,7 @@ class AppController extends ChangeNotifier {
     final qty = (cart[id] ?? 0) - 1;
     if (qty <= 0) {
       cart.remove(id);
+      _cartItemDetails.remove(id);
       final remoteId = _remoteCartItemIds.remove(id);
       notifyListeners();
       if (TokenStore.isLoggedIn && remoteId != null) {
@@ -1127,13 +1142,20 @@ class AppController extends ChangeNotifier {
   int qtyOf(String id) => cart[id] ?? 0;
 
   List<MapEntry<MenuItem, int>> get cartLines => cart.entries
-      .where((e) => e.value > 0 && menu.any((m) => m.id == e.key))
-      .map((e) => MapEntry(menuItemById(e.key), e.value))
+      .where((e) => e.value > 0)
+      .map((e) {
+        final item = menuItemById(e.key);
+        final preservedItem = menu.any((m) => m.id == e.key)
+            ? item
+            : _cartItemDetails[e.key];
+        return preservedItem == null ? null : MapEntry(preservedItem, e.value);
+      })
+      .whereType<MapEntry<MenuItem, int>>()
       .toList();
 
   int get cartCount => cart.values.fold(0, (a, b) => a + b);
 
-  bool get hasCart => cartCount > 0;
+  bool get hasCart => cartLines.isNotEmpty;
   bool get cartEmpty => !hasCart;
 
   int get orderBadgeCount {
@@ -1322,6 +1344,7 @@ class AppController extends ChangeNotifier {
       placedId = (data['orderId'] ?? data['id'] ?? data['_id'])?.toString();
     }
     cart.clear();
+    _cartItemDetails.clear();
     _remoteCartItemIds.clear();
     appliedCouponCode = null;
     await AppRepository.syncOrders();
@@ -1345,6 +1368,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> clearRemoteCart() async {
     cart.clear();
+    _cartItemDetails.clear();
     _remoteCartItemIds.clear();
     notifyListeners();
     if (!TokenStore.isLoggedIn) return;

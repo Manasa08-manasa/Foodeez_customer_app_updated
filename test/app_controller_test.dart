@@ -15,15 +15,31 @@ void main() {
     expect(app.hasCart, isFalse);
   });
 
-  testWidgets('home screen shows nearby restaurant count from live list', (tester) async {
+  test('unknown cart entries do not show the view cart banner', () {
+    final app = AppController();
+
+    app.cart['stale-item'] = 2;
+
+    expect(app.cartCount, 2);
+    expect(app.hasCart, isFalse);
+    expect(app.cartEmpty, isTrue);
+  });
+
+  testWidgets('home screen shows nearby restaurant count from live list', (
+    tester,
+  ) async {
     await tester.pumpWidget(const ProviderScope(child: FoodeezApp()));
     await tester.pump();
 
-    final app = ProviderScope.containerOf(tester.element(find.byType(MaterialApp))).read(appControllerProvider);
+    final app = ProviderScope.containerOf(
+      tester.element(find.byType(MaterialApp)),
+    ).read(appControllerProvider);
     app.setTab('home');
     await tester.pump();
 
-    final countText = tester.widget<Text>(find.textContaining('restaurants around you')).data;
+    final countText = tester
+        .widget<Text>(find.textContaining('restaurants around you'))
+        .data;
     expect(countText, '${mock_data.restaurants.length} restaurants around you');
   });
 }

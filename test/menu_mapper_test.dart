@@ -51,6 +51,25 @@ void main() {
     expect(items[1].desc, 'Grilled cottage cheese');
   });
 
+  test('menu maps website vegetarian flags for both filters', () {
+    final items = RemoteMappers.menu({
+      'categories': [
+        {
+          'name': 'Main Course',
+          'items': [
+            {'id': 'veg-1', 'name': 'Rice', 'is_vegetarian': true},
+            {'id': 'nonveg-1', 'name': 'Chicken', 'isVegetarian': false},
+          ],
+        },
+      ],
+    });
+
+    expect(items.where((item) => item.veg).map((item) => item.id), ['veg-1']);
+    expect(items.where((item) => !item.veg).map((item) => item.id), [
+      'nonveg-1',
+    ]);
+  });
+
   test('restaurant maps brandDescription and address', () {
     final r = RemoteMappers.restaurant({
       'id': '89052db6-e17e-428b-9c1e-8bea861a9edd',

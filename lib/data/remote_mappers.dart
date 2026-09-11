@@ -85,7 +85,8 @@ class RemoteMappers {
     const earthKm = 6371.0;
     final dLat = (lat2 - lat1) * math.pi / 180;
     final dLng = (lng2 - lng1) * math.pi / 180;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1 * math.pi / 180) *
             math.cos(lat2 * math.pi / 180) *
             math.sin(dLng / 2) *
@@ -316,11 +317,17 @@ class RemoteMappers {
     required String name,
     required String section,
   }) {
-    final raw = m['isVeg'] ??
+    final raw =
+        m['isVeg'] ??
         m['is_veg'] ??
+        m['isVegetarian'] ??
+        m['is_vegetarian'] ??
         m['veg'] ??
         m['vegetarian'] ??
         m['foodType'] ??
+        m['food_type'] ??
+        m['itemType'] ??
+        m['item_type'] ??
         m['type'];
     if (raw is bool) return raw;
     if (raw != null) {
@@ -570,7 +577,11 @@ class RemoteMappers {
       restId = _str(j, ['restaurantId', 'branchId'], '');
     }
     if (restName.isEmpty) {
-      restName = _str(j, ['restaurantName', 'restaurantLabel', 'branchName'], '');
+      restName = _str(j, [
+        'restaurantName',
+        'restaurantLabel',
+        'branchName',
+      ], '');
     }
 
     final orderId = _str(j, ['id', '_id', 'orderId'], '');

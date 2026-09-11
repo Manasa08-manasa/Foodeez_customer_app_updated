@@ -11,6 +11,7 @@ class AppRepository {
   AppRepository._();
 
   static bool backendLive = false;
+  static bool cartSyncSucceeded = false;
 
   static Future<bool> hydrate() async {
     await TokenStore.init();
@@ -22,7 +23,9 @@ class AppRepository {
     if (TokenStore.refreshToken != null) {
       try {
         await CustomerAuthApi.refresh();
-      } catch (_) {/* keep existing access token */}
+      } catch (_) {
+        /* keep existing access token */
+      }
     }
 
     // Nearby first at current/fallback coords so Home has API restaurants
@@ -149,16 +152,21 @@ class AppRepository {
   static Future<List<Restaurant>> searchRestaurants(String q) async {
     try {
       final res = await CustomerDiscoveryApi.search(
-          q, ApiConfig.lat, ApiConfig.lng);
+        q,
+        ApiConfig.lat,
+        ApiConfig.lng,
+      );
       final list = RemoteMappers.discoveryRestaurants(res);
       backendLive = true;
       return list;
     } catch (_) {
       final needle = q.toLowerCase();
       return store.restaurants
-          .where((r) =>
-              r.name.toLowerCase().contains(needle) ||
-              r.cuisines.toLowerCase().contains(needle))
+          .where(
+            (r) =>
+                r.name.toLowerCase().contains(needle) ||
+                r.cuisines.toLowerCase().contains(needle),
+          )
           .toList();
     }
   }
@@ -166,7 +174,9 @@ class AppRepository {
   static Future<bool> syncTrending() async {
     try {
       final res = await CustomerDiscoveryApi.trending(
-          ApiConfig.lat, ApiConfig.lng);
+        ApiConfig.lat,
+        ApiConfig.lng,
+      );
       final mapped = RemoteMappers.discoveryRestaurants(res);
       if (mapped.isEmpty) return false;
       // Prefer trending order at the front; keep others after.
@@ -189,15 +199,26 @@ class AppRepository {
   static Future<bool> syncPopularDishes() async {
     try {
       final res = await CustomerDiscoveryApi.popularDishes(
-          ApiConfig.lat, ApiConfig.lng);
-      final list = RemoteMappers.unwrapList(
-          res, ['dishes', 'items', 'popularDishes', 'results']);
+        ApiConfig.lat,
+        ApiConfig.lng,
+      );
+      final list = RemoteMappers.unwrapList(res, [
+        'dishes',
+        'items',
+        'popularDishes',
+        'results',
+      ]);
       if (list.isEmpty) return false;
       store.popularDishNames
         ..clear()
-        ..addAll(list.map((j) =>
-            (j['name'] ?? j['itemName'] ?? j['title'] ?? '').toString())
-            .where((s) => s.isNotEmpty));
+        ..addAll(
+          list
+              .map(
+                (j) =>
+                    (j['name'] ?? j['itemName'] ?? j['title'] ?? '').toString(),
+              )
+              .where((s) => s.isNotEmpty),
+        );
       backendLive = true;
       return true;
     } catch (e) {
@@ -302,10 +323,14 @@ class AppRepository {
         }
       } else {
         list.addAll(
-          RemoteMappers.unwrapList(
-            res,
-            ['foodeezOffers', 'restaurantOffers', 'coupons', 'catalog', 'results', 'items'],
-          ),
+          RemoteMappers.unwrapList(res, [
+            'foodeezOffers',
+            'restaurantOffers',
+            'coupons',
+            'catalog',
+            'results',
+            'items',
+          ]),
         );
       }
       final mapped = <Coupon>[
@@ -327,15 +352,20 @@ class AppRepository {
   static Future<void> syncRestaurantCoupons(String restaurantId) async {
     try {
       final res = await CouponsApi.forRestaurant(restaurantId);
-      final list =
-          RemoteMappers.unwrapList(res, ['coupons', 'results', 'items']);
+      final list = RemoteMappers.unwrapList(res, [
+        'coupons',
+        'results',
+        'items',
+      ]);
       var i = store.coupons.length;
       for (final j in list) {
         final c = RemoteMappers.coupon(j, i++);
         if (!store.coupons.any((e) => e.code == c.code)) store.coupons.add(c);
       }
       backendLive = true;
-    } catch (_) {/* fail-soft */}
+    } catch (_) {
+      /* fail-soft */
+    }
   }
 
   // ── Cart ───────────────────────────────────────────────────────────────────
@@ -343,19 +373,21 @@ class AppRepository {
   /// Pulls server cart into local id→qty map. Returns remote ids keyed by menu item.
   static Future<Map<String, String>> syncCart() async {
     final remoteIds = <String, String>{};
+    cartSyncSucceeded = false;
     try {
       final res = await CustomerCartApi.get();
       final data = RemoteMappers.unwrap(res);
       final items = data is Map
           ? RemoteMappers.unwrapList(data, ['items', 'cartItems', 'results'])
           : RemoteMappers.unwrapList(res, ['items', 'cartItems', 'results']);
-      if (items.isEmpty) return remoteIds;
 
       final local = <String, int>{};
       for (final it in items) {
         final menuId =
-            (it['menuItemId'] ?? it['itemId'] ?? it['productId'] ?? '').toString();
-        final cartItemId = (it['id'] ?? it['_id'] ?? it['cartItemId'] ?? '').toString();
+            (it['menuItemId'] ?? it['itemId'] ?? it['productId'] ?? '')
+                .toString();
+        final cartItemId = (it['id'] ?? it['_id'] ?? it['cartItemId'] ?? '')
+            .toString();
         final qty = (it['quantity'] is num)
             ? (it['quantity'] as num).round()
             : int.tryParse('${it['quantity']}') ?? 1;
@@ -363,17 +395,15 @@ class AppRepository {
         local[menuId] = qty;
         if (cartItemId.isNotEmpty) remoteIds[menuId] = cartItemId;
       }
-      if (local.isNotEmpty) {
-        // Caller merges into AppController.cart
-        store.lastSyncedCart
-          ..clear()
-          ..addAll(local);
-      }
+      store.lastSyncedCart
+        ..clear()
+        ..addAll(local);
       final coupon = data is Map
           ? (data['couponCode'] ?? data['appliedCoupon'] ?? '').toString()
           : '';
       if (coupon.isNotEmpty) store.lastSyncedCouponCode = coupon;
       backendLive = true;
+      cartSyncSucceeded = true;
     } catch (e) {
       debugPrint('[AppRepository] cart sync failed: $e');
     }
@@ -386,7 +416,12 @@ class AppRepository {
     try {
       final res = await CustomerOrdersApi.history(limit: 20);
       // Backend: { data: [...orders], meta } — unwrapList digs the array.
-      var list = RemoteMappers.unwrapList(res, ['orders', 'results', 'items', 'data']);
+      var list = RemoteMappers.unwrapList(res, [
+        'orders',
+        'results',
+        'items',
+        'data',
+      ]);
       if (list.isEmpty) {
         final raw = RemoteMappers.unwrap(res);
         if (raw is List) {
@@ -522,8 +557,11 @@ class AppRepository {
   static Future<bool> syncAddresses() async {
     try {
       final ares = await CustomerProfileApi.getAddresses();
-      final addrs =
-          RemoteMappers.unwrapList(ares, ['addresses', 'results', 'items']);
+      final addrs = RemoteMappers.unwrapList(ares, [
+        'addresses',
+        'results',
+        'items',
+      ]);
       // Normalize lat/lng onto top-level keys so Select Location / Home can pin.
       final normalized = addrs.map((raw) {
         final a = Map<String, dynamic>.from(raw);
@@ -541,8 +579,14 @@ class AppRepository {
             lat ??= coords[1];
           }
         }
-        if (lat != null) a['latitude'] = lat is num ? lat.toDouble() : double.tryParse(lat.toString());
-        if (lng != null) a['longitude'] = lng is num ? lng.toDouble() : double.tryParse(lng.toString());
+        if (lat != null)
+          a['latitude'] = lat is num
+              ? lat.toDouble()
+              : double.tryParse(lat.toString());
+        if (lng != null)
+          a['longitude'] = lng is num
+              ? lng.toDouble()
+              : double.tryParse(lng.toString());
         return a;
       }).toList();
       store.addresses
@@ -550,8 +594,9 @@ class AppRepository {
         ..addAll(normalized);
       if (normalized.isNotEmpty) {
         final def = normalized.firstWhere(
-            (a) => a['isDefault'] == true,
-            orElse: () => normalized.first);
+          (a) => a['isDefault'] == true,
+          orElse: () => normalized.first,
+        );
         final line1 = (def['addressLine1'] ?? '').toString();
         final city = (def['city'] ?? '').toString();
         if (line1.isNotEmpty) {
@@ -606,7 +651,10 @@ class AppRepository {
     return false;
   }
 
-  static Future<bool> updateAddress(String id, Map<String, dynamic> data) async {
+  static Future<bool> updateAddress(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
     try {
       await CustomerProfileApi.updateAddress(id, data);
       await syncAddresses();
@@ -641,9 +689,11 @@ class AppRepository {
 
   /// Ensures a default delivery address exists (sync saved addresses or create from GPS).
   static Future<bool> ensureDefaultAddressForCheckout() async {
-    if (store.defaultAddressId != null && store.defaultAddressId!.isNotEmpty) return true;
+    if (store.defaultAddressId != null && store.defaultAddressId!.isNotEmpty)
+      return true;
     await syncAddresses();
-    if (store.defaultAddressId != null && store.defaultAddressId!.isNotEmpty) return true;
+    if (store.defaultAddressId != null && store.defaultAddressId!.isNotEmpty)
+      return true;
     if (!TokenStore.isLoggedIn) return false;
 
     try {
@@ -672,21 +722,43 @@ class AppRepository {
     try {
       final rRes = await CustomerProfileApi.getFavRestaurants();
       final iRes = await CustomerProfileApi.getFavItems();
-      final rests = RemoteMappers.unwrapList(
-          rRes, ['restaurants', 'favorites', 'results', 'items']);
-      final items = RemoteMappers.unwrapList(
-          iRes, ['items', 'favorites', 'results', 'menuItems']);
+      final rests = RemoteMappers.unwrapList(rRes, [
+        'restaurants',
+        'favorites',
+        'results',
+        'items',
+      ]);
+      final items = RemoteMappers.unwrapList(iRes, [
+        'items',
+        'favorites',
+        'results',
+        'menuItems',
+      ]);
       store.favoriteRestaurantIds
         ..clear()
-        ..addAll(rests.map((j) =>
-            (j['id'] ?? j['_id'] ?? j['restaurantId'] ?? j['branchId'] ?? '')
-                .toString())
-            .where((s) => s.isNotEmpty));
+        ..addAll(
+          rests
+              .map(
+                (j) =>
+                    (j['id'] ??
+                            j['_id'] ??
+                            j['restaurantId'] ??
+                            j['branchId'] ??
+                            '')
+                        .toString(),
+              )
+              .where((s) => s.isNotEmpty),
+        );
       store.favoriteMenuItemIds
         ..clear()
-        ..addAll(items.map((j) =>
-            (j['id'] ?? j['_id'] ?? j['menuItemId'] ?? '').toString())
-            .where((s) => s.isNotEmpty));
+        ..addAll(
+          items
+              .map(
+                (j) =>
+                    (j['id'] ?? j['_id'] ?? j['menuItemId'] ?? '').toString(),
+              )
+              .where((s) => s.isNotEmpty),
+        );
       backendLive = true;
       return true;
     } catch (e) {
@@ -714,7 +786,10 @@ class AppRepository {
     return false;
   }
 
-  static Future<bool> toggleFavItem(String menuItemId, String restaurantId) async {
+  static Future<bool> toggleFavItem(
+    String menuItemId,
+    String restaurantId,
+  ) async {
     final isFav = store.favoriteMenuItemIds.contains(menuItemId);
     try {
       if (isFav) {
@@ -752,17 +827,25 @@ class AppRepository {
   static Future<bool> syncWalletTransactions() async {
     try {
       final res = await CustomerPaymentsApi.transactions();
-      final list = RemoteMappers.unwrapList(
-          res, ['transactions', 'results', 'items']);
+      final list = RemoteMappers.unwrapList(res, [
+        'transactions',
+        'results',
+        'items',
+      ]);
       store.walletTransactions
         ..clear()
-        ..addAll(list.map((j) => {
+        ..addAll(
+          list.map(
+            (j) => {
               'id': (j['id'] ?? j['_id'] ?? '').toString(),
-              'title': (j['title'] ?? j['description'] ?? j['type'] ?? 'Transaction')
-                  .toString(),
+              'title':
+                  (j['title'] ?? j['description'] ?? j['type'] ?? 'Transaction')
+                      .toString(),
               'amount': j['amount'] ?? j['value'] ?? 0,
               'createdAt': (j['createdAt'] ?? j['date'] ?? '').toString(),
-            }));
+            },
+          ),
+        );
       backendLive = true;
       return true;
     } catch (e) {
@@ -771,7 +854,10 @@ class AppRepository {
     return false;
   }
 
-  static Future<bool> topupWallet(num amount, {String gateway = 'razorpay'}) async {
+  static Future<bool> topupWallet(
+    num amount, {
+    String gateway = 'razorpay',
+  }) async {
     try {
       await CustomerPaymentsApi.topupInitiate(amount, gateway);
       await syncWallet();
@@ -808,7 +894,8 @@ class AppRepository {
   }
 
   static Future<List<Map<String, dynamic>>> restaurantReviews(
-      String restaurantId) async {
+    String restaurantId,
+  ) async {
     try {
       final res = await CustomerReviewsApi.byRestaurant(restaurantId);
       backendLive = true;
@@ -823,16 +910,23 @@ class AppRepository {
   static Future<bool> syncSupportTickets() async {
     try {
       final res = await CustomerSupportApi.getTickets();
-      final list =
-          RemoteMappers.unwrapList(res, ['tickets', 'results', 'items']);
+      final list = RemoteMappers.unwrapList(res, [
+        'tickets',
+        'results',
+        'items',
+      ]);
       store.supportTickets
         ..clear()
-        ..addAll(list.map((j) => {
+        ..addAll(
+          list.map(
+            (j) => {
               'id': (j['id'] ?? j['_id'] ?? '').toString(),
               'type': (j['type'] ?? '').toString(),
               'description': (j['description'] ?? '').toString(),
               'status': (j['status'] ?? 'OPEN').toString(),
-            }));
+            },
+          ),
+        );
       backendLive = true;
       return true;
     } catch (e) {
