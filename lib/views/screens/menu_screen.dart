@@ -34,6 +34,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -41,57 +42,65 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.fromLTRB(AppResponsive.of(context).pagePadding, 10, AppResponsive.of(context).pagePadding, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.chipBorder,
-                      borderRadius: BorderRadius.circular(2),
+            child: SizedBox(
+              height: MediaQuery.sizeOf(sheetContext).height * 0.78,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.chipBorder,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                Text('Menu', style: AppText.display(size: 18)),
-                const SizedBox(height: 6),
-                ...sections.map((sec) {
-                  return InkWell(
-                    onTap: () => _jumpToSection(sec.key),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.hairline),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            sec.key,
-                            style: AppText.body(
-                              size: 15,
-                              weight: FontWeight.w700,
+                  Text('Menu', style: AppText.display(size: 18)),
+                  const SizedBox(height: 6),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: sections.length,
+                      itemBuilder: (context, index) {
+                        final sec = sections[index];
+                        return InkWell(
+                          onTap: () => _jumpToSection(sec.key),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: AppColors.hairline),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  sec.key,
+                                  style: AppText.body(
+                                    size: 15,
+                                    weight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  '${sec.value.length} items',
+                                  style: AppText.body(
+                                    size: 12.5,
+                                    weight: FontWeight.w500,
+                                    color: AppColors.bodyGrey,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(
-                            '${sec.value.length} items',
-                            style: AppText.body(
-                              size: 12.5,
-                              weight: FontWeight.w500,
-                              color: AppColors.bodyGrey,
-                            ),
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  );
-                }),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -323,35 +332,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                               ],
                             ),
                           )
-                        else if (rest.offer.isNotEmpty)
-                          DashedRect(
-                            borderColor: AppColors.dashedOfferBorder,
-                            fillColor: AppColors.dashedOfferBg,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.bolt,
-                                  color: AppColors.gold,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    rest.offer,
-                                    style: AppText.body(
-                                      size: 13,
-                                      weight: FontWeight.w700,
-                                      color: AppColors.offerTextBrown,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        
                       ],
                     ),
                   ),
